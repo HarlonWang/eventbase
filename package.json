@@ -1,0 +1,53 @@
+{
+  "name": "@harlonwang/eventbase",
+  "version": "0.0.0",
+  "description": "Self-hosted app analytics on Cloudflare Workers + D1: batched ingestion, typed query endpoint, as a Hono sub-app factory.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HarlonWang/eventbase.git"
+  },
+  "homepage": "https://github.com/HarlonWang/eventbase#readme",
+  "keywords": [
+    "analytics",
+    "telemetry",
+    "events",
+    "cloudflare-workers",
+    "d1",
+    "hono"
+  ],
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "migrations"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint:comments": "node scripts/lint-comments.mjs"
+  },
+  "peerDependencies": {
+    "hono": "^4.12.8"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "~0.13.1",
+    "@cloudflare/workers-types": "~4.20260317.1",
+    "hono": "^4.12.8",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.0",
+    "wrangler": "~4.74.0"
+  }
+}

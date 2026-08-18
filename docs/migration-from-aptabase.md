@@ -1,0 +1,48 @@
+# 从 Aptabase 迁移
+
+动机、迁移面、阶段与成本。**具体业务读数（事件量、增长曲线、订阅成本）在 `trendingai-notes.md`**，本文只留结论。
+
+> **编号说明**：本文的章节编号沿用调研原稿（2026-08-18 拆分入库），跨文件引用共用同一套编号：
+>
+> | 章节 | 所在文件 |
+> |---|---|
+> | §1 动机、§3 容量测算、§8 迁移面、§9 阶段与成本 | `docs/migration-from-aptabase.md`（数字在 `trendingai-notes.md`） |
+> | §2 决策、§4 存储与部署拓扑、§5 接入形态、§6 仓库关系 | `docs/design.md` |
+> | §7 摄取端滥用面、§10~§14（L1~L4 与待议） | `docs/telemetry-design.md` |
+> | 两端契约 | `docs/protocol.md` |
+
+---
+
+## 1. 动机
+
+| 痛点 | 说明 |
+|---|---|
+| $10/月订阅 | 次要。省下 ≈ $120/年 |
+| **没有查询 API** | **主要**。每次分析只能人肉导 CSV 再喂给 Claude，分析闭环无法自动化，定期复核（如 `/sponsor-review` 的行为侧）永远卡在手工步骤 |
+
+因此自建的第一优先级不是省钱，是**一个带 token 的取数接口**。看板 UI 是次要目标（v1 明确不做）。
+
+## 8. 迁移面（已核实）
+
+| 事实 | 影响 |
+|---|---|
+| 客户端上报已收口成一个函数：`platformTrackEvent`（ TrendingAI/shared/src/commonMain/kotlin/whl/trending/ai/core/platform/Platform.kt ） | 130 个调用点、约 60 个事件名一个都不用改，只换 actual 实现 |
+| iOS 侧 `platformTrackEvent` 现为空实现 | 自建顺带补上 iOS 埋点（Aptabase 也没接） |
+| Aptabase SDK 白送的：批量、离线队列、重试、session 归组、自动采集（OS/版本/locale/国家） | **真正的工作量在客户端库**，不在服务端的 INSERT |
+| 后端 D1 的 `usage_events` 是计费账本 | 与埋点无关，别混口径 |
+| Play 数据安全表单声明的采集方是第三方 | 换自建后要同步改 |
+
+## 9. 阶段与成本
+
+| 阶段 | 内容 | 估时 |
+|---|---|---|
+| 0 | 本文档：L1 边界 → L2 指标 → L3 数据模型逐层定稿 | 0.5~1 天 |
+| 1 | 服务端 npm 库：摄取端点 + migration + 限流/事件名白名单/体积上限 + 测试 | 1~2 天 |
+| 2 | KMP 客户端库：install_id、批量、持久化队列、重试、session 计时 | 2~3 天 |
+| 3 | TrendingAI 接入 + **新旧双写并跑**（1~2 周观察期） | 0.5 天 |
+| 4 | 取数 SQL 集（照 loginbase `queries/`）；看板另算 3~5 天 | 0.5 天 |
+| 5 | Aptabase 历史 CSV 一次性导入 D1 | 0.5 天 |
+
+合计约 5~7 个工作日（不含看板）。运行成本 ≈ $0（在既有 Workers Paid $5/月 的包含额度内，见第 3 节）。
+
+阶段 3、5 不可省：已有 0.22.0 / 1.0.0 两次埋点断点的教训（见 TrendingAI `docs/analytics-notes.md`），再来一次「跨切换点数据不可比」会让留存基线彻底断掉。双写期需多付 1~2 个月 Aptabase 订阅。
