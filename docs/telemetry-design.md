@@ -168,6 +168,12 @@ CREATE TABLE install_first_seen (
   channel TEXT, app_version TEXT, platform TEXT, country TEXT
 );
 
+-- 日配额计数（实现时补，2026-08-19）。限流绑定按 colo 局部计数，跨 colo 的日配额只能落库。
+CREATE TABLE ingest_quota (
+  day TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL,
+  PRIMARY KEY (day, key)
+);
+
 -- 业务维表每日快照（补法 2）：现在几十行
 CREATE TABLE dim_identity_daily (
   day TEXT NOT NULL, user_id TEXT NOT NULL,

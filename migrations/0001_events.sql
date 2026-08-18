@@ -66,3 +66,11 @@ CREATE TABLE IF NOT EXISTS dim_identity_daily (
   first_seen INTEGER,
   PRIMARY KEY (day, user_id)
 );
+
+-- 日配额计数。限流绑定按 colo 局部计数，跨 colo 的日配额只能落库。
+CREATE TABLE IF NOT EXISTS ingest_quota (
+  day TEXT NOT NULL,
+  key TEXT NOT NULL,
+  n   INTEGER NOT NULL,
+  PRIMARY KEY (day, key)
+);

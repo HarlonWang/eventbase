@@ -2,7 +2,7 @@
 # 本包是库，不部署 Worker；[vars] 均为测试假值。
 name = "eventbase-test"
 main = "src/index.ts"
-compatibility_date = "2026-04-01"
+compatibility_date = "2026-03-17"
 
 [[d1_databases]]
 binding = "DB"

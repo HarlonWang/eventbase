@@ -44,9 +44,10 @@ npm 裸名 `eventbase` 被 2014 年的废弃包占用，已去信询问转让；
 
 ## 状态
 
-**设计定稿、实现未开始**（2026-08-18）。L1~L4 四层全部定稿，见 `docs/telemetry-design.md`。落地顺序：
+**摄取端已实现**（2026-08-19），L1~L4 四层定稿见 `docs/telemetry-design.md`。落地顺序：
 
-1. 服务端库：摄取端点 + migration + 限流/配额 + 测试
+1. ✅ 服务端库：摄取端点 `POST <prefix>/e`、服务端 writer `createTracker`、migration、限流/配额（22 个测试）
+   ⬜ 取数端点 `GET <prefix>/q`
 2. KMP 客户端库：install_id、批量、持久化队列、重试、生命周期事件
 3. TrendingAI 接入：换掉 Aptabase + 按新词汇重构调用点
 4. 取数 SQL 集
