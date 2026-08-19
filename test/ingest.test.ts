@@ -293,6 +293,16 @@ describe("丢弃计数", () => {
     expect(await rows()).toHaveLength(1);
   });
 
+  it("配额触顶且批内混有无效事件时，同一事件不被记两次", async () => {
+    const app = ingest({ quotas: { perInstallPerDay: 1 } });
+    await post(app, batch());
+    await post(app, batch({ events: [{ name: "app_opened" }, { name: "Bad Name" }] }));
+
+    const d = await drops();
+    expect(d.quota).toBe(1);
+    expect(d.invalid).toBe(1);
+  });
+
   it("限流丢弃刻意不记账——那条路径必须保持零 D1", async () => {
     const limiter = { limit: async () => ({ success: false }) };
     await post(ingest({ limiter: () => limiter }), batch());

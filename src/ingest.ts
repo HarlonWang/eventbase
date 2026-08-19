@@ -56,8 +56,9 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
     }
 
     if (await overQuota(db, config, batch.install, now)) {
+      // 只记通过校验的那些：无效事件已按自己的原因记过，用 batch.events.length 会重复记账。
       // 配额路径本来就读了一次 D1，再记一笔可接受；限流路径必须保持零 D1，故不在那里记
-      drops.set("quota", (drops.get("quota") ?? 0) + batch.events.length);
+      if (events.length > 0) drops.set("quota", (drops.get("quota") ?? 0) + events.length);
       await db.batch(dropStatements(db, day, drops));
       return c.body(null, 204);
     }
