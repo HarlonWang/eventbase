@@ -227,6 +227,22 @@ describe("受限 SQL", () => {
     }
   });
 
+  /**
+   * SQLite 允许 WITH 打头接写操作，首词检查会放行——**写关键字黑名单是唯一拦得住的那道**。
+   * 这几条就是它存在的理由；没有它们，删掉黑名单时测试仍全绿，洞就这么开了。
+   */
+  it("WITH 打头的写操作同样拒绝", async () => {
+    for (const statement of [
+      "WITH x AS (SELECT 1) DELETE FROM events",
+      "WITH x AS (SELECT 1) UPDATE events SET name = 'x'",
+      "WITH x AS (SELECT id FROM events) INSERT INTO events (day) SELECT day FROM x",
+    ]) {
+      const res = await sql(query(), statement);
+      expect(res.status).toBe(400);
+      expect((await res.json<{ error: string }>()).error).toContain("write statements");
+    }
+  });
+
   it("多语句拒绝——防夹带写操作", async () => {
     expect((await sql(query(), "SELECT 1; DELETE FROM events")).status).toBe(400);
   });
@@ -248,14 +264,16 @@ describe("受限 SQL", () => {
     expect((await sql(query(), "SELECT 1 /* x */; DELETE FROM events")).status).toBe(400);
   });
 
-  it("表名白名单：元信息表读不到", async () => {
+  /**
+   * 去掉表白名单后元信息表可读——**这是刻意的**：schema 随 npm 包公开（migrations/*.sql
+   * 就在包里），拦它是表演；而调用方已持 admin token、本库又只有埋点数据。
+   */
+  it("元信息表可读，属刻意放开", async () => {
     for (const statement of [
-      "SELECT sql FROM sqlite_master",
-      'SELECT sql FROM "sqlite_master"',
-      "SELECT * FROM pragma_table_info('events')",
-      "SELECT * FROM events JOIN sqlite_master ON 1 = 1",
+      "SELECT name FROM sqlite_master WHERE type = 'table'",
+      "SELECT name FROM main.sqlite_master",
     ]) {
-      expect((await sql(query(), statement)).status).toBe(400);
+      expect((await sql(query(), statement)).status).toBe(200);
     }
   });
 
@@ -280,9 +298,8 @@ describe("受限 SQL", () => {
     }
   });
 
-  it("schema 限定名：既不绕过白名单，也不被误杀", async () => {
+  it("schema 限定名不被误杀", async () => {
     expect((await sql(query(), "SELECT COUNT(*) AS n FROM main.events")).status).toBe(200);
-    expect((await sql(query(), "SELECT sql FROM main.sqlite_master")).status).toBe(400);
   });
 
   it("撑内存与加载扩展的函数拒绝", async () => {

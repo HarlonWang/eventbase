@@ -125,24 +125,16 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
   return app;
 }
 
-// 白名单要跟着 migrations 走：新增表若不登记，运维就查不了它。
-// ingest_drops 曾因白名单定稿早于建表而漏掉，冒烟时才暴露。
-const ALLOWED_TABLES = new Set([
-  "events",
-  "install_first_seen",
-  "install_identity",
-  "daily_rollup",
-  "dim_identity_daily",
-  "ingest_quota",
-  "ingest_drops",
-]);
-
 const WRITE_KEYWORDS = /\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum)\b/i;
 const BANNED_CALLS = /\b(load_extension|randomblob|zeroblob)\s*\(/i;
 
 /**
- * 所有检查只看**骨架**——剥掉字符串字面量与注释后的 SQL。护栏清单见 docs/protocol.md：
- * 表名走白名单（`sqlite_master` 自然出局），不往关键词黑名单继续加词。
+ * 所有检查只看**骨架**——剥掉字符串字面量与注释后的 SQL。护栏只保两条底线：
+ * **只读**（单语句 + 首词 + 写关键字，三者缺一不可）与**不拖垮**（递归 CTE、危险函数）。
+ *
+ * 刻意**不做表白名单**：本库只有埋点表，schema 随 npm 包公开，调用方已持 admin token——
+ * 拦不到有价值的东西，却要养一套正则 SQL 表名解析器，还会因漏登记新表挡住正当查询
+ * （2026-08-19 上线冒烟即撞上 ingest_drops）。爆炸半径由拆库限住：业务数据在另一个库。
  */
 function rejectUnsafe(sql: string): string | null {
   if (!sql) return "sql is required";
@@ -157,14 +149,8 @@ function rejectUnsafe(sql: string): string | null {
   if (call) return `function not allowed: ${call[1].toLowerCase()}`;
 
   // SQLite 不要求 RECURSIVE 关键字（2026-08-19 实测），递归只能靠「CTE 体里 FROM 了自己」认
-  const defined = ctes(skeleton);
-  for (const cte of defined) {
+  for (const cte of ctes(skeleton)) {
     if (referencedTables(cte.body).includes(cte.name)) return "recursive CTE is not allowed";
-  }
-
-  const names = new Set(defined.map((cte) => cte.name));
-  for (const table of referencedTables(skeleton)) {
-    if (!ALLOWED_TABLES.has(table) && !names.has(table)) return `table not allowed: ${table}`;
   }
   return null;
 }

@@ -34,12 +34,19 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 | 单条语句（骨架含 `;` 即拒） | 夹带第二条语句 |
 | 首词必须是 `SELECT` / `WITH` | 写操作——SQLite 的 DML 必须以自身关键字开头 |
 | 写类关键字一律拒 | 子查询里的写操作 |
-| **表名白名单**：`events` / `install_first_seen` / `install_identity` / `daily_rollup` / `dim_identity_daily` / `ingest_quota`（`WITH` 定义的 CTE 名自动放行；`main.events` 这类限定名取点号后一段） | 读 `sqlite_master`、`pragma_*` 表值函数等元信息面 |
 | 拒绝递归 CTE：`RECURSIVE` 关键字，以及**任何在自己的体里 `FROM` 自己的 CTE** | 递归 CTE 的 CPU 炸弹。**SQLite 不要求写 `RECURSIVE`**（2026-08-19 实测），只查关键字挡不住 |
 | 函数黑名单：`load_extension` / `randomblob` / `zeroblob` | 加载扩展、撑内存 |
 | 结果封顶 `maxRows`（默认 1000，超出截断并返回 `truncated: true`） | 巨量结果集 |
 
-方向是白名单而非继续往黑名单加词：**没有找到「能写数据又能通过检查」的构造**，剩余风险都在资源与信息面，白名单对这两面更彻底。
+护栏只保两条底线：**只读**（单语句 + 首词 + 写关键字，三者缺一不可——SQLite 允许 `WITH x AS (…) DELETE …`，首词检查会放行，写关键字黑名单是唯一拦得住的那道）与**不拖垮**（递归 CTE、危险函数、结果封顶）。对抗测试的结论是：**没有找到「能写数据又能通过检查」的构造**。
+
+**刻意不做表名白名单**（2026-08-19 拍板）。它防的是「读了不该读的表」，而本库：
+
+- 只有埋点表——业务数据（`identities` / `paddle_subscriptions` / `gh_token_enc`）在**另一个库、另一个 binding**，爆炸半径由拆库限住，与白名单无关；
+- schema 随 npm 包公开（`migrations/*.sql` 就在包里），拦 `sqlite_master` 是表演；
+- 调用方已持 admin token，本就该能读全部埋点数据。
+
+而代价是真实的：要养一套正则 SQL 表名解析器（子查询、别名、引号、`main.x` 限定名、CTE 遮蔽都要处理，天生不完备），且**每加一张表都要回头登记，漏了就静默挡住正当查询**——上线冒烟当天就撞上 `ingest_drops`。用不完备的解析器做安全判断，漏判给虚假安全感、误判挡真实用途，两头不讨好。
 
 **未配置 `adminToken` 时整个取数面返回 404**——宁可没有这个面，也不要一个没有门的读接口。
 
