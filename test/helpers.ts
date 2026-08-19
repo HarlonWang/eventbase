@@ -1,10 +1,11 @@
 import { env } from "cloudflare:workers";
 import schema from "../migrations/0001_events.sql?raw";
 import locale from "../migrations/0002_install_locale.sql?raw";
+import drops from "../migrations/0003_ingest_drops.sql?raw";
 import { createIngest, createQuery } from "../src/index";
 
 export async function initDb() {
-  for (const stmt of [schema, locale].join(";").split(";").filter((s) => s.trim())) {
+  for (const stmt of [schema, locale, drops].join(";").split(";").filter((s) => s.trim())) {
     // ALTER TABLE ADD COLUMN 没有 IF NOT EXISTS，重复 initDb 时只能靠吞这一种错
     await env.DB.prepare(stmt)
       .run()
@@ -15,7 +16,7 @@ export async function initDb() {
 }
 
 export async function wipeDb() {
-  for (const table of ["events", "install_first_seen", "install_identity", "ingest_quota"]) {
+  for (const table of ["events", "install_first_seen", "install_identity", "ingest_quota", "ingest_drops"]) {
     await env.DB.prepare(`DELETE FROM ${table}`).run();
   }
 }

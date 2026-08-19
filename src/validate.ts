@@ -32,6 +32,9 @@ export interface NormalizedEvent {
 
 export type BatchError = { status: 400; message: string };
 
+/** 丢弃原因，落 ingest_drops 用 */
+export type DropReason = "invalid" | "expired" | "future" | "unknown_event";
+
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
 }
@@ -74,15 +77,15 @@ export function normalizeEvent(
   event: IncomingEvent,
   now: number,
   allowed?: readonly string[]
-): NormalizedEvent | null {
-  if (!isRecord(event)) return null;
+): NormalizedEvent | DropReason {
+  if (!isRecord(event)) return "invalid";
   const name = str(event.name);
-  if (!name || name.length > LIMITS.eventName || !EVENT_NAME_RE.test(name)) return null;
-  if (allowed && !allowed.includes(name)) return null;
+  if (!name || name.length > LIMITS.eventName || !EVENT_NAME_RE.test(name)) return "invalid";
+  if (allowed && !allowed.includes(name)) return "unknown_event";
 
   const at = typeof event.at === "number" && Number.isFinite(event.at) ? event.at : now;
-  if (at > now + LIMITS.futureMs) return null;
-  if (at < now - LIMITS.pastMs) return null;
+  if (at > now + LIMITS.futureMs) return "future";
+  if (at < now - LIMITS.pastMs) return "expired";
 
   return { name, at, flow: str(event.flow) ?? null, props: normalizeProps(event.props) };
 }
