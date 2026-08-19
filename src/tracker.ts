@@ -28,10 +28,8 @@ export async function flushEvents(): Promise<void> {
 }
 
 /**
- * 服务端事件不走 HTTP，直接写 D1。**返回的函数永不抛**——埋点绝不能成为业务的故障源，
- * 这条保证由库兑现，不摊派给每个调用点。写入 Promise 的 rejection 之外，
- * `prepare` / `waitUntil` / 缺 `request` 的同步抛出同样被接住。
- * 判据：漏斗末端落在业务库的，补发 server 事件，不靠跨库 JOIN。
+ * 服务端事件 writer：不走 HTTP，直接写 D1。返回的函数**永不抛**，也不返回结果。
+ * 何时该补发 server 事件见 docs/telemetry-design.md 的「起步要补发的 server 事件」。
  */
 export function createTracker(db: D1Database, options: TrackerOptions = {}) {
   return (ctx: TrackContext, event: ServerEvent): void => {
