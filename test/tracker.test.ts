@@ -62,3 +62,41 @@ describe("服务端事件", () => {
     await flushEvents();
   });
 });
+
+/**
+ * 「埋点绝不能成为业务的故障源」由库兑现，不摊派给调用点。
+ * 写入 Promise 的 rejection 之外，同步抛出的三个来源都要接住。
+ */
+describe("永不抛", () => {
+  const event = { name: "quota_blocked" };
+
+  it("prepare 同步抛出", () => {
+    const db = { prepare: () => { throw new Error("D1 down"); } } as unknown as D1Database;
+
+    expect(() => createTracker(db)({ request }, event)).not.toThrow();
+  });
+
+  it("waitUntil 同步抛出", () => {
+    expect(() =>
+      createTracker(env.DB)(
+        { request, waitUntil: () => { throw new Error("outside request scope"); } },
+        event
+      )
+    ).not.toThrow();
+  });
+
+  it("缺 request 时不炸在取地理上", () => {
+    expect(() =>
+      createTracker(env.DB)({ request: undefined as unknown as Request }, event)
+    ).not.toThrow();
+  });
+
+  it("消费方的 onError 自己抛也不外泄", () => {
+    const db = { prepare: () => { throw new Error("D1 down"); } } as unknown as D1Database;
+    const tracker = createTracker(db, {
+      onError: () => { throw new Error("logger exploded"); },
+    });
+
+    expect(() => tracker({ request }, event)).not.toThrow();
+  });
+});
