@@ -278,13 +278,14 @@ CREATE TABLE dim_identity_daily (
 | 单一 taxonomy 来源 | 同一份定义供客户端与服务端白名单，两侧不漂移 |
 | 变更纪律 | **语义变了就用新事件名，绝不复用旧名**——根治「同名不同义」 |
 
-#### 新词汇：19 个事件（由约 70 个收拢而来）
+#### 新词汇：20 个事件（由约 70 个收拢而来）
 
 | 事件 | 关键 props | 吃掉的旧事件 |
 |---|---|---|
 | `app_opened` | `is_cold` | `app_started` |
 | `app_backgrounded` | `duration_s`, `is_wake`（后台唤醒标记，见 12.5） | `app_session` |
 | `notification_opened` | `kind` | `daily_picks_notification_open` |
+| `notification_delivery` | `step`（shown / skipped / relinked）, `kind`, `reason`, `attempt`, `delay_min` | `daily_picks_notification_shown` / `_skipped` / `daily_picks_alarm_relinked` |
 | `screen_viewed` | `screen`, `from` | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
 | `tab_switched` | `tab`, `method`（tap / double_tap_refresh） | `tab_switch` / `tab_double_tap_refresh` |
 | `content_opened` | `source`, `section`, `rank`, `content_id`, `title` | `item_click` |
@@ -298,13 +299,20 @@ CREATE TABLE dim_identity_daily (
 | `upsell_clicked` | `source`, `target`（pro / sponsor / newsletter） | `pro_upsell_clicked` / `settings_donate` / `settings_donate_github` / `settings_summary_language_sponsor` |
 | `checkout_step` | `step`（plan_selected / opened / reconciled / **completed**[业]）, `plan`, `source` | `plan_selected` / `checkout_opened` / `checkout_reconciled` + 服务端补发的成单 |
 | `subscription_action` | `action`（manage / cancel）, `outcome` | `manage_subscription_click` |
-| `newsletter_action` | `action`（banner_shown / banner_dismissed / submit / cancel）, `result`, `lang`, `status` | `picks_newsletter_banner` / `_dismiss` / `subscribe_submit` / `subscribe_cancel` |
+| `newsletter_action` | `action`（banner_clicked / banner_dismissed / submit / cancel）, `result`, `lang`, `status` | `picks_newsletter_banner` / `_dismiss` / `subscribe_submit` / `subscribe_cancel` |
 | `setting_changed` | `key`, `value` | `settings_language_change` / `settings_summary_language_change` / `settings_theme_change` / `settings_seed_color` / `settings_app_icon` / `settings_immersive_toggle` / `settings_open_links_in_browser` / `settings_default_home_tab_change` / `settings_daily_picks_notification` / `settings_custom_theme` 等 10+ |
 | `api_failed` | `endpoint`, `status` | `billing_prices_failed` / `billing_checkout_failed` / `billing_subscription_failed` / `billing_portal_failed` / `pro_refresh_failed` |
 | `force_update` | `step`（shown / clicked） | `force_update_shown` / `force_update_click` |
 | `feedback_sent` | `kind`, `value` | `settings_summary_language_feedback` / `settings_feedback` |
 
 （`digest_unavailable_shown` 并入 `screen_viewed` 的 `screen=digest_unavailable`。）
+
+**接入时（2026-08-19，TrendingAI 客户端）对本表的四处修正**：
+
+1. 新增 `notification_delivery`——通知**送达侧**的三个事件本表原先没有归宿，而 `shown` 正是「通知打开率」的分母，删掉只剩分子。
+2. `newsletter_action` 的 `banner_shown` 改为 `banner_clicked`：旧事件 `picks_newsletter_banner` 记的其实是**点击**而非曝光，按原值命名会造出一个语义反的口径。
+3. `feedback_sent` 只收**真正提交**的那次（摘要语言支持请求）；旧的 `settings_feedback` / `settings_summary_language_feedback` 是跳转反馈页的点击，归 `screen_viewed(screen=feedback)`。
+4. `chat_image_add` 删除，不进词汇——信号已在 `ai_requested.image_count` 里，代价是丢掉相册/拍照之分。
 
 #### 保留 `title` 属性的理由
 
