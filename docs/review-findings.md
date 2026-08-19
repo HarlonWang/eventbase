@@ -56,33 +56,35 @@ S1~S10 由另一个会话自主修复（2026-08-19，43 测试通过）。S5/S7 
 
 `/sql` 的护栏结论：**没有找到「能写数据又能通过检查」的构造**（SQLite 的 DML 必须以自身关键字开头，首词检查卡死了这条路），漏网的四条都不是写入而是资源与信息面。真要收紧，方向是白名单（限表 + 禁 `RECURSIVE` + 扫描行数封顶），不是往黑名单继续加词。
 
-## 客户端 eventbase-kt（23 条，全部待修）
+## 客户端 eventbase-kt（23 条）
+
+K1~K9、K11、K12、K15~K17、K19、K23 由 PR #2 修复并合并（2026-08-19，39 测试通过）。剩余见下表 ⬜ 行。
 
 | # | 问题 | 来源 | 级别 |
 |---|---|---|---|
-| K1 | `EventQueue` 非线程安全：`track()` 在锁外改 `ArrayDeque` | 三方 | **P0** |
-| K2 | `userId` 在 flush 时才快照 → 匿名期事件被算到登录账号头上 | ultra | **P0** |
-| K3 | `sessionId` 跨进程重启误归因 | ultra | **P0** |
-| K4 | 重复 init 产生两个 `EventQueue` 共用一份 Storage，互相覆盖 → 丢事件 | 三方 | **P0** |
-| K5 | `decode()` 单条坏数据丢掉整个队列 | ultra | **P0** |
-| K6 | `expectSuccess` 开启时 4xx 被判 RETRY → 无效事件永久卡队列 | CR | **P0** |
-| K7 | `onBackground` 的 early return 把 flush 也跳过了 | CR | **P0** |
-| K8 | `apply()` 异步，强杀丢 install_id / 队列 | 三方 | **P0** |
-| K9 | 重复注册 `ActivityLifecycleCallbacks` | CR + ultra | P1 |
+| K1 | `EventQueue` 非线程安全：`track()` 在锁外改 `ArrayDeque` | 三方 | ✅ 已修（expect/actual `Lock`） |
+| K2 | `userId` 在 flush 时才快照 → 匿名期事件被算到登录账号头上 | ultra | ✅ 已修（入队时定格） |
+| K3 | `sessionId` 跨进程重启误归因 | ultra | ✅ 已修（入队时定格） |
+| K4 | 重复 init 产生两个 `EventQueue` 共用一份 Storage，互相覆盖 → 丢事件 | 三方 | ✅ 已修（install 先到先得 + 锁内原子） |
+| K5 | `decode()` 单条坏数据丢掉整个队列 | ultra | ✅ 已修（逐条解析） |
+| K6 | `expectSuccess` 开启时 4xx 被判 RETRY → 无效事件永久卡队列 | CR | ✅ 已修（请求级 `expectSuccess = false`） |
+| K7 | `onBackground` 的 early return 把 flush 也跳过了 | CR | ✅ 已修（无条件 flush） |
+| K8 | `apply()` 异步，强杀丢 install_id / 队列 | 三方 | ✅ 已修（`commit()`） |
+| K9 | 重复注册 `ActivityLifecycleCallbacks` | CR + ultra | ✅ 已修（仅 isNew 时注册） |
 | K10 | 旋转屏幕切出假会话 | ultra | P1 |
-| K11 | `onForeground` 非幂等 → iOS 重复回调压缩 `duration_s` | CR | P1 |
-| K12 | `userId` 读写非线程安全 | ultra | P1 |
+| K11 | `onForeground` 非幂等 → iOS 重复回调压缩 `duration_s` | CR | ✅ 已修（幂等） |
+| K12 | `userId` 读写非线程安全 | ultra | ✅ 已修（`@Volatile`） |
 | K13 | iOS observer token 丢失，无法注销 | ultra + 自审 | P1 |
 | K14 | `HttpClient` 无超时，卡住占着 flush mutex | CR + 自审 | P1 |
-| K15 | `props` 未快照，调用方之后改 map 会影响已入队事件 | CR | P1 |
-| K16 | `purgeExpired` 只从队头停，时钟回拨会漏清 | CR | P1 |
-| K17 | `props` 类型往返 Int→Long | CR + 自审 | P1 |
+| K15 | `props` 未快照，调用方之后改 map 会影响已入队事件 | CR | ✅ 已修（`canonicalProps` 入队即摊平） |
+| K16 | `purgeExpired` 只从队头停，时钟回拨会漏清 | CR | ✅ 已修（全量过滤） |
+| K17 | `props` 类型往返 Int→Long | CR + 自审 | ✅ 已修（入队即规范化数值类型） |
 | K18 | `track()` 全量序列化整个队列，O(n) 落在调用线程 | CR + 自审 | P2 |
-| K19 | `runCatching` 吞 `CancellationException`（**ultra 否掉、CR 报了**，判 CR 对、影响小） | CR | P2 |
+| K19 | `runCatching` 吞 `CancellationException`（**ultra 否掉、CR 报了**，判 CR 对、影响小） | CR | ✅ 已修（重新抛出） |
 | K20 | `AppOpened.isCold` 恒 true，死参数 | ultra | P2 |
 | K21 | README + Config KDoc 还写着定时 flush | CR + ultra | P3 |
 | K22 | `QueueTest` 断言扁平化，测不出单批 ≤25 | CR | P3 |
-| K23 | `BodyTest` 用 `content` 断言，测不出类型回归 | CR | P3 |
+| K23 | `BodyTest` 用 `content` 断言，测不出类型回归 | CR | ✅ 已修（改断言类型） |
 
 ### 两条要一起看的
 
