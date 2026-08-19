@@ -43,9 +43,13 @@ Kotlin 包    wang.harlon.eventbase
 npm 裸名 `eventbase` 被 2014 年的废弃包占用，已去信询问转让；未拿到前用 scoped 名。
 scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须对应已存在的 npm 用户或组织。
 
-**0.1.0 是本地手动发布的一次性例外**，没有对应 tag：`publish.yml` 由 tag 触发，
+**0.1.x 目前是本地手动发布**，没有对应 tag：`publish.yml` 由 tag 触发，
 而 npm 侧的 trusted publisher 尚未配置，打 tag 只会留下一次注定失败的 CI 运行。
 配好之后从下一个版本起走 CI 发布。
+
+⚠️ **0.1.2 是坏的，别用**——它打包了一份陈旧 `dist`（表白名单其实没被移除）。
+根因是 `npm publish` 不会构建，而那次发布前 dist 停留在更早的 commit。
+0.1.3 起 `prepublishOnly` 会强制 typecheck + build + test，这条路径已堵死。
 
 ## 状态
 
