@@ -178,6 +178,28 @@ describe("指标", () => {
   });
 });
 
+describe("丢弃读数", () => {
+  it("drops 指标按原因拆", async () => {
+    await env.DB.prepare("INSERT INTO ingest_drops (day, reason, n) VALUES ('2026-08-10','invalid',3),('2026-08-10','quota',7)").run();
+
+    const body = await (await get(query(), "/m/drops?from=2026-08-01&to=2026-08-31")).json<{
+      rows: { dim: string; value: number }[];
+    }>();
+
+    expect(body.rows).toEqual([
+      { day: "2026-08-10", dim: "invalid", value: 3 },
+      { day: "2026-08-10", dim: "quota", value: 7 },
+    ]);
+  });
+
+  /** 白名单漏登记新表，运维就查不了它——ingest_drops 上线冒烟时才暴露过一次 */
+  it("ingest_drops 在 SQL 白名单里", async () => {
+    const res = await sql(query(), "SELECT COUNT(*) AS n FROM ingest_drops");
+
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("受限 SQL", () => {
   it("SELECT 放行", async () => {
     await seed("2026-08-10", "a");

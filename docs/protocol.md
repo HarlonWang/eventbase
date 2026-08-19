@@ -25,7 +25,7 @@
 | `name` | 仅 `events` 指标：按事件名过滤 |
 | `n` | 仅 `retention` 指标：第 N 日回访，默认 1。须为 `0..90` 的整数，超范围 400 |
 
-v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装日队列）、`events`（按事件名计数）、`retention`（安装日队列的第 N 日回访）。
+v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装日队列）、`events`（按事件名计数）、`retention`（安装日队列的第 N 日回访）、`drops`（摄取端丢弃数，按原因拆）。
 
 `POST /sql` 的护栏，**全部作用在「骨架」上**——先把字符串字面量、`--` 行注释、`/* */` 块注释剥成空白，再做下列检查，所以 `WHERE props LIKE '%update%'` 这类正当查询不会被误杀，注释里藏关键词也骗不过：
 
