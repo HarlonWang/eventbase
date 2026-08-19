@@ -8,6 +8,19 @@ export interface WriteContext {
   receivedAt: number;
 }
 
+/** 按天按原因累加。与事件写入同一个 batch，失败一起回滚。 */
+export function dropStatements(
+  db: D1Database,
+  day: string,
+  tally: Map<string, number>
+): D1PreparedStatement[] {
+  const insert = db.prepare(
+    `INSERT INTO ingest_drops (day, reason, n) VALUES (?, ?, ?)
+     ON CONFLICT(day, reason) DO UPDATE SET n = n + excluded.n`
+  );
+  return [...tally].map(([reason, n]) => insert.bind(day, reason, n));
+}
+
 export function eventStatements(
   db: D1Database,
   events: NormalizedEvent[],

@@ -2,9 +2,10 @@ import { Hono } from "hono";
 import type { IngestConfig } from "./config.js";
 import { geoOf } from "./geo.js";
 import { LIMITS } from "./limits.js";
-import { eventStatements, firstSeenStatement, identityStatement, quotaStatement, readQuota } from "./store.js";
+import { dropStatements, eventStatements, firstSeenStatement, identityStatement, quotaStatement, readQuota } from "./store.js";
 import { dayOf } from "./time.js";
 import { normalizeEvent, parseBatch } from "./validate.js";
+import type { NormalizedEvent } from "./validate.js";
 
 /**
  * 摄取端。**成功路径恒 204**，不区分「已入库」与「已丢弃」——客户端收到 204 即出队，
@@ -38,17 +39,34 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
 
     const limiter = config.limiter?.(env);
     if (limiter && !(await limiter.limit({ key: batch.install })).success) {
+      // 这条路径必须保持零 D1：洪水时每请求写一行等于把限流的作用抵消掉
       return c.body(null, 204);
     }
 
     const now = Date.now();
-    const events = batch.events
-      .map((e) => normalizeEvent(e, now, config.allowedEvents))
-      .filter((e) => e !== null);
-    if (events.length === 0) return c.body(null, 204);
-
+    const day = dayOf(now);
     const db = config.db(env);
-    if (await overQuota(db, config, batch.install, now)) return c.body(null, 204);
+
+    const events: NormalizedEvent[] = [];
+    const drops = new Map<string, number>();
+    for (const raw of batch.events) {
+      const normalized = normalizeEvent(raw, now, config.allowedEvents);
+      if (typeof normalized === "string") drops.set(normalized, (drops.get(normalized) ?? 0) + 1);
+      else events.push(normalized);
+    }
+
+    if (await overQuota(db, config, batch.install, now)) {
+      // 只记通过校验的那些：无效事件已按自己的原因记过，用 batch.events.length 会重复记账。
+      // 配额路径本来就读了一次 D1，再记一笔可接受；限流路径必须保持零 D1，故不在那里记
+      if (events.length > 0) drops.set("quota", (drops.get("quota") ?? 0) + events.length);
+      await db.batch(dropStatements(db, day, drops));
+      return c.body(null, 204);
+    }
+
+    if (events.length === 0) {
+      if (drops.size > 0) await db.batch(dropStatements(db, day, drops));
+      return c.body(null, 204);
+    }
 
     const ctx = { batch, geo: geoOf(c.req.raw), receivedAt: now };
     const statements = [
@@ -56,6 +74,7 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
       firstSeenStatement(db, events, ctx),
       identityStatement(db, ctx),
       ...quotaStatements(db, config, batch.install, events.length, now),
+      ...dropStatements(db, day, drops),
     ].filter((s) => s !== null);
 
     await db.batch(statements);

@@ -170,6 +170,15 @@ CREATE TABLE install_first_seen (
 -- debug 批不写此表：一台机器可能既跑 debug 又跑正式包，写了就永久钉死；
 -- 不写则留存的分母天然干净，比加 is_debug 列少一次迁移。
 
+-- 摄取端丢弃计数（实现时补，2026-08-19）。恒 204 让丢弃对客户端不可见，
+-- 服务端自己得留一笔，否则「丢了多少」我们也答不上来。按天按原因聚合，不带 install 维度。
+-- 限流丢弃刻意不记：那条路径必须保持零 D1，洪水时每请求写一行等于抵消限流。
+CREATE TABLE ingest_drops (
+  day TEXT NOT NULL, reason TEXT NOT NULL,  -- invalid | expired | future | unknown_event | quota
+  n INTEGER NOT NULL,
+  PRIMARY KEY (day, reason)
+);
+
 -- 日配额计数（实现时补，2026-08-19）。限流绑定按 colo 局部计数，跨 colo 的日配额只能落库。
 CREATE TABLE ingest_quota (
   day TEXT NOT NULL, key TEXT NOT NULL, n INTEGER NOT NULL,

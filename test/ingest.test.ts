@@ -243,3 +243,77 @@ describe("辅助表", () => {
     expect(result.results).toHaveLength(0);
   });
 });
+
+describe("丢弃计数", () => {
+  async function drops(): Promise<Record<string, number>> {
+    const result = await env.DB.prepare("SELECT reason, n FROM ingest_drops").all<{ reason: string; n: number }>();
+    return Object.fromEntries(result.results.map((r) => [r.reason, r.n]));
+  }
+
+  it("按原因分别累加：格式非法、过期、未来", async () => {
+    const now = Date.now();
+    await post(
+      ingest(),
+      batch({
+        events: [
+          { name: "app_opened", at: now },
+          { name: "Bad Name", at: now },
+          { name: "too_old", at: now - 8 * 24 * 60 * 60 * 1000 },
+          { name: "too_new", at: now + 11 * 60 * 1000 },
+        ],
+      })
+    );
+
+    expect(await drops()).toEqual({ invalid: 1, expired: 1, future: 1 });
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("白名单外的事件单独计一类", async () => {
+    await post(
+      ingest({ allowedEvents: ["app_opened"] }),
+      batch({ events: [{ name: "app_opened" }, { name: "unknown_event" }] })
+    );
+
+    expect(await drops()).toEqual({ unknown_event: 1 });
+  });
+
+  it("整批都无效时也记账", async () => {
+    await post(ingest(), batch({ events: [{ name: "Bad" }, { name: "Also Bad" }] }));
+
+    expect(await drops()).toEqual({ invalid: 2 });
+    expect(await rows()).toHaveLength(0);
+  });
+
+  it("配额触顶记 quota，且不落事件", async () => {
+    const app = ingest({ quotas: { perInstallPerDay: 1 } });
+    await post(app, batch());
+    await post(app, batch({ events: [{ name: "app_opened" }, { name: "screen_viewed" }] }));
+
+    expect((await drops()).quota).toBe(2);
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("配额触顶且批内混有无效事件时，同一事件不被记两次", async () => {
+    const app = ingest({ quotas: { perInstallPerDay: 1 } });
+    await post(app, batch());
+    await post(app, batch({ events: [{ name: "app_opened" }, { name: "Bad Name" }] }));
+
+    const d = await drops();
+    expect(d.quota).toBe(1);
+    expect(d.invalid).toBe(1);
+  });
+
+  it("限流丢弃刻意不记账——那条路径必须保持零 D1", async () => {
+    const limiter = { limit: async () => ({ success: false }) };
+    await post(ingest({ limiter: () => limiter }), batch());
+
+    expect(await drops()).toEqual({});
+  });
+
+  it("多次请求在同一天累加到同一行", async () => {
+    await post(ingest(), batch({ events: [{ name: "Bad" }] }));
+    await post(ingest(), batch({ events: [{ name: "Bad" }] }));
+
+    expect((await drops()).invalid).toBe(2);
+  });
+});
