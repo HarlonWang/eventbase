@@ -203,7 +203,7 @@ CREATE TABLE dim_identity_daily (
 
 ### 12.4 取数端点
 
-`GET /t/q`，`Authorization: Bearer <TELEMETRY_ADMIN_TOKEN>`。两种形态并存：
+`GET /t/q`，`Authorization: Bearer <EVENTBASE_ADMIN_TOKEN>`。两种形态并存：
 
 1. **固定指标**（核心 10 条各一个 name，带日期范围与切片参数）——稳定、可缓存、给定期复核用；
 2. **受限 SQL**（只允许 `SELECT`、只连埋点库、结果行数封顶）——给临时追问与 Claude 用。

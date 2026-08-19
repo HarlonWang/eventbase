@@ -8,7 +8,7 @@
 
 | 路径 | 角色 |
 |---|---|
-| `/Users/wanghl/TrendingProjects/github-ai-trending-api` | **首个消费方**：裸 JS Worker，`/t/*` 挂载摄取端；埋点落独立 D1（`trending-telemetry`），业务库不动 |
+| `/Users/wanghl/TrendingProjects/github-ai-trending-api` | **首个消费方**：裸 JS Worker，`/t/*` 挂载摄取端；埋点落独立 D1（`trending-events`），业务库不动 |
 | `/Users/wanghl/TrendingProjects/TrendingAI` | 客户端消费方：约 130 个调用点要按新词汇重构，替换 Aptabase |
 | `/Users/wanghl/eventbase-kt` | **姊妹仓**：KMP 客户端库，独立版本线与 CI；协议以本仓 `docs/protocol.md` 为唯一权威，客户端仓不留副本 |
 | `/Users/wanghl/loginbase` | 邻居 + 将来的消费方：把本库列为 peerDependency，登录事件写进埋点库，其 `auth_events` 退役 |

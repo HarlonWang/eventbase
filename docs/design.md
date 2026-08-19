@@ -21,7 +21,7 @@
 | 2 | **数据落各 App 自己的 D1** | 与 loginbase「不做中心化账号」一致；跨 App 对比靠手工拼，接受 |
 | 3 | **与 loginbase 的 `auth_events` 合表**：新库统管一张事件表，登录事件也进来 | 否则登录漏斗的服务端段与客户端段永远拼不起来（loginbase 待议清单里「客户端事件与服务端事件同表 ✅」已是同一结论） |
 | 4 | **loginbase 把本库列为 peerDependency**，直接调本库的 writer，消费方零接线 | 同日一并改判 loginbase 的「依赖最小集」铁律为「依赖准入」（业界权威库 + 自己的库可依赖），原先被铁律逼出的配置注入绕法随之取消 |
-| 5 | **埋点独立一个 D1 库**（如 `trending-telemetry`），与业务库分开 | D1 每库单线程，埋点洪水与分析慢查询会抢业务的执行队列；付费档拆库零边际成本。**这是唯一不可逆的一项**，故先定。详见第 4 节 |
+| 5 | **埋点独立一个 D1 库**（`trending-events`，binding `EVENTS_DB`），与业务库分开 | D1 每库单线程，埋点洪水与分析慢查询会抢业务的执行队列；付费档拆库零边际成本。**这是唯一不可逆的一项**，故先定。详见第 4 节 |
 | 6 | **单 Worker 起步**：摄取端挂在现有业务 Worker 上（路径 `/t/*`），不另建 Worker | 性能影响实质为零，而两 Worker 方案的成本大头是**不可版本化的控制台配置**，会被 App 数量乘起来。拆分是**可逆**的将来项，判据见 4.5 |
 
 ### 决策 4 的展开（2026-08-18 改判）
@@ -126,12 +126,21 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 
 ## 5. 接入形态与部署
 
+### 5.0 命名：为什么是 `trending-events` 而不是 `trending-telemetry`
+
+词汇一致性优先：库叫 `eventbase`、表叫 `events`，库名再引入第三个词会让人每次都要在脑子里做一次映射。
+
+语义上 `telemetry` 也不是最准的那个词：OpenTelemetry 之后，telemetry 在行业里越来越指向 traces / metrics / logs
+这一侧的**系统运行状态**，而本项目的核心 10 条指标全是留存、渗透率、漏斗这类**产品分析**（analytics）。
+业界确实大量把客户端行为回传也叫 telemetry（VS Code、Firefox、.NET CLI），所以那样叫不算错，只是会带来
+「里面应该有链路和指标」的错误预期。
+
 ### 5.1 拓扑（TrendingAI 为例）
 
 ```
 客户端 App ──► api.trendingai.cn/t/*    ─┐
                                          ├─► [业务 Worker] ─binding─► D1: trending（业务）
-业务请求  ──► api.trendingai.cn/api/*  ─┘         └────────binding─► D1: trending-telemetry（埋点）
+业务请求  ──► api.trendingai.cn/api/*  ─┘         └────────binding─► D1: trending-events（埋点）
 ```
 
 - 客户端不改 host、无新 DNS/证书，CN 链路与现状一致；
@@ -152,13 +161,13 @@ npx wrangler d1 create <app>-telemetry                      # 1. 建库
 # 2. wrangler.toml：加 d1 binding（migrations_dir 指向 node_modules）+ ratelimit binding
 npx wrangler d1 migrations apply <app>-telemetry --remote   # 3. 迁移
 npm i <包>                                                  # 4. 装包，index.js 加 3 行挂载 /t
-npx wrangler secret put TELEMETRY_ADMIN_TOKEN               # 5. 取数 token
+npx wrangler secret put EVENTBASE_ADMIN_TOKEN               # 5. 取数 token
 ```
 
 ```toml
 [[d1_databases]]
-binding = "TELEMETRY_DB"
-database_name = "trending-telemetry"
+binding = "EVENTS_DB"
+database_name = "trending-events"
 migrations_dir = "node_modules/<包>/migrations"   # 免复制迁移文件，升级包即带新迁移
 ```
 
@@ -209,7 +218,7 @@ Maven 侧
 | D1 库 | 表 | migration 由谁分发 | 谁写 |
 |---|---|---|---|
 | `trending`（业务） | `identities` / `sessions` / `paddle_subscriptions` / `pro_entitlements` / `chat_logs` / `usage_events` … | 业务仓自己（`sessions` 定义来自 loginbase） | 业务代码（含 loginbase 的会话读写） |
-| `trending-telemetry` | `events` / `daily_rollup` / 维表快照 | **埋点包** | 摄取端（客户端事件）+ 业务代码（server 事件，**含 loginbase 的登录事件**） |
+| `trending-events` | `events` / `daily_rollup` / 维表快照 | **埋点包** | 摄取端（客户端事件）+ 业务代码（server 事件，**含 loginbase 的登录事件**） |
 
 loginbase 因此是"劈开"的：**会话状态留业务库，事件搬去埋点库**——这就是它要多接受一个 D1 binding、`auth_events` 退役的含义。
 
