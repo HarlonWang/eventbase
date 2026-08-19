@@ -68,7 +68,14 @@ CTE 影子名（`WITH sqlite_master AS (...) SELECT * FROM sqlite_master`）实�
 
 ## 客户端 eventbase-kt（23 条）
 
-K1~K9、K11、K12、K15~K17、K19、K23 由 PR #2 修复并合并（2026-08-19，39 测试通过）。剩余见下表 ⬜ 行。
+**23 条已全部关闭**（2026-08-19）：K1~K9、K11、K12、K15~K17、K19、K23 由 PR #2 修复；K10、K13、K14、K18、K20~K22 由 PR #3 修复。
+
+PR #2 与 PR #3 各自又被 CodeRabbit 与本地 `/code-review` 审出新问题（多为上一轮修复引入），一并处理：
+最重的一条是 K18 的增量落盘**自己造出了一个丢数据 bug**——重启后首次 `add()` 会抹掉盘上未合并的 pending 事件；
+已修并补了会随修复撤销而变红的回归测试。随后一轮 `/simplify` 又把冷启动的阻塞写与多余的 fsync 去掉。
+
+**过程结论**：修复轮会生成新发现（PR#2 出 5 条、PR#3 出 5+5 条），但严重度逐轮下降
+（丢数据 → 取消错 scope → 注释过长）；配一轮只做减法的 `/simplify` 是必要的对冲。
 
 | # | 问题 | 来源 | 状态 |
 |---|---|---|---|
@@ -81,19 +88,19 @@ K1~K9、K11、K12、K15~K17、K19、K23 由 PR #2 修复并合并（2026-08-19�
 | K7 | `onBackground` 的 early return 把 flush 也跳过了 | CR | ✅ 已修（无条件 flush） |
 | K8 | `apply()` 异步，强杀丢 install_id / 队列 | 三方 | ✅ 已修（`commit()`） |
 | K9 | 重复注册 `ActivityLifecycleCallbacks` | CR + ultra | ✅ 已修（仅 isNew 时注册） |
-| K10 | 旋转屏幕切出假会话 | ultra | ⬜ P1 |
+| K10 | 旋转屏幕切出假会话 | ultra | ✅ 已修（ProcessLifecycleOwner，700ms 去抖） |
 | K11 | `onForeground` 非幂等 → iOS 重复回调压缩 `duration_s` | CR | ✅ 已修（幂等） |
 | K12 | `userId` 读写非线程安全 | ultra | ✅ 已修（`@Volatile`） |
-| K13 | iOS observer token 丢失，无法注销 | ultra + 自审 | ⬜ P1 |
-| K14 | `HttpClient` 无超时，卡住占着 flush mutex | CR + 自审 | ⬜ P1 |
+| K13 | iOS observer token 丢失，无法注销 | ultra + 自审 | ✅ 已修（留 token + detachLifecycle） |
+| K14 | `HttpClient` 无超时，卡住占着 flush mutex | CR + 自审 | ✅ 已修（默认 client 装 HttpTimeout） |
 | K15 | `props` 未快照，调用方之后改 map 会影响已入队事件 | CR | ✅ 已修（`canonicalProps` 入队即摊平） |
 | K16 | `purgeExpired` 只从队头停，时钟回拨会漏清 | CR | ✅ 已修（全量过滤） |
 | K17 | `props` 类型往返 Int→Long | CR + 自审 | ✅ 已修（入队即规范化数值类型） |
-| K18 | `track()` 全量序列化整个队列，O(n) 落在调用线程 | CR + 自审 | ⬜ P2 |
+| K18 | `track()` 全量序列化整个队列，O(n) 落在调用线程 | CR + 自审 | ✅ 已修（base+pending 增量落盘，simplify 后再去掉冷启动阻塞写） |
 | K19 | `runCatching` 吞 `CancellationException`（**ultra 否掉、CR 报了**，判 CR 对、影响小） | CR | ✅ 已修（重新抛出） |
-| K20 | `AppOpened.isCold` 恒 true，死参数 | ultra | ⬜ P2 |
-| K21 | README + Config KDoc 还写着定时 flush | CR + ultra | ⬜ P3 |
-| K22 | `QueueTest` 断言扁平化，测不出单批 ≤25 | CR | ⬜ P3 |
+| K20 | `AppOpened.isCold` 恒 true，死参数 | ultra | ✅ 已修（去掉死参数） |
+| K21 | README + Config KDoc 还写着定时 flush | CR + ultra | ✅ 已修 |
+| K22 | `QueueTest` 断言扁平化，测不出单批 ≤25 | CR | ✅ 已修（断言分批边界） |
 | K23 | `BodyTest` 用 `content` 断言，测不出类型回归 | CR | ✅ 已修（改断言类型） |
 
 ### 两条要一起看的
