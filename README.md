@@ -51,7 +51,7 @@ scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须�
 
 **摄取端已实现**（2026-08-19），L1~L4 四层定稿见 `docs/telemetry-design.md`。落地顺序：
 
-1. ✅ 服务端库：摄取端点（`createIngest`）、服务端 writer（`createTracker`）、取数端点（`createQuery`）、migration、限流/配额——38 个测试
+1. ✅ 服务端库：摄取端点（`createIngest`）、服务端 writer（`createTracker`）、取数端点（`createQuery`）、migration、限流/配额、丢弃计数、事件幂等 id——71 个测试。前缀由 `basePath` 传入，消费方无需自建 Hono
 2. KMP 客户端库：install_id、批量、持久化队列、重试、生命周期事件
 3. TrendingAI 接入：换掉 Aptabase + 按新词汇重构调用点
 4. 取数 SQL 集

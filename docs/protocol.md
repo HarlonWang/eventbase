@@ -14,7 +14,7 @@
 | `GET` | `<queryPrefix>/m/:metric` | 同上 | 固定指标 |
 | `POST` | `<queryPrefix>/sql` | 同上 | 受限单条 SELECT / WITH |
 
-前缀由消费方挂载时决定，TrendingAI 用 `/t`（摄取）与 `/t/q`（取数）。摄取与取数是两个 factory：`createIngest` 与 `createQuery`，可分别挂载或只挂其一。
+前缀由消费方通过 `basePath` 传给库（TrendingAI 用 `/t` 与 `/t/q`），库内部用 Hono 的 `basePath` 处理——消费方直接 `.fetch()`，**不必自己依赖 hono 做前缀嫁接**。摄取与取数是两个 factory：`createIngest` 与 `createQuery`，可分别挂载或只挂其一。
 
 ## 取数
 

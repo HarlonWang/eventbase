@@ -3,6 +3,8 @@ import { dayOf } from "./time.js";
 
 export interface QueryConfig<TEnv> {
   db: (env: TEnv) => D1Database;
+  /** 挂载前缀，如 `/t/q` → 索引在 `/t/q`、指标在 `/t/q/m/:metric`。见 IngestConfig.basePath */
+  basePath?: string;
   /** 未配置则整个取数面不挂载：宁可 404，也不要一个没有门的读接口 */
   adminToken: (env: TEnv) => string | undefined;
   maxRows?: number;
@@ -31,7 +33,7 @@ const METRIC_SLICES: Record<keyof typeof METRICS, readonly Slice[]> = {
 };
 
 export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
-  const app = new Hono<{ Bindings: TEnv }>();
+  const app = new Hono<{ Bindings: TEnv }>().basePath(config.basePath ?? "");
   const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS;
 
   app.use("*", async (c, next) => {

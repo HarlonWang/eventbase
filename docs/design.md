@@ -157,11 +157,34 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 ### 5.3 接入清单（新 App，约 15 分钟）
 
 ```bash
-npx wrangler d1 create <app>-telemetry                      # 1. 建库
+npx wrangler d1 create <app>-events                         # 1. 建库
 # 2. wrangler.toml：加 d1 binding（migrations_dir 指向 node_modules）+ ratelimit binding
-npx wrangler d1 migrations apply <app>-telemetry --remote   # 3. 迁移
-npm i @whlong/eventbase                                     # 4. 装包，index.js 加 3 行挂载 /t
+npx wrangler d1 migrations apply <app>-events --remote      # 3. 迁移
+npm i @whlong/eventbase                                     # 4. 装包，接入点见下
 npx wrangler secret put EVENTBASE_ADMIN_TOKEN               # 5. 取数 token
+```
+
+接入点（消费方**不需要自己装 hono、也不需要 new Hono**——前缀由 `basePath` 交给库处理）：
+
+```js
+import { createIngest, createQuery } from '@whlong/eventbase';
+
+export const events = createIngest({
+    basePath: '/t',                       // 摄取端点即 /t/e
+    db: (env) => env.EVENTS_DB,
+    limiter: (env) => env.EVENTBASE_LIMITER,
+    quotas: { perInstallPerDay: 2000, totalPerDay: 500_000 },
+});
+
+export const eventsQuery = createQuery({
+    basePath: '/t/q',                     // 索引 /t/q、指标 /t/q/m/:metric
+    db: (env) => env.EVENTS_DB,
+    adminToken: (env) => env.EVENTBASE_ADMIN_TOKEN,
+});
+
+// 入口按前缀分发，与 loginbase 的 login.fetch 同一形状
+if (pathname.startsWith('/t/q')) return eventsQuery.fetch(request, env, ctx);
+if (pathname.startsWith('/t'))   return events.fetch(request, env, ctx);
 ```
 
 ```toml
