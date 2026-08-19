@@ -23,6 +23,32 @@ describe("鉴权", () => {
   });
 });
 
+describe("挂载前缀", () => {
+  it("索引与指标都落在前缀下", async () => {
+    const app = query({ basePath: "/t/q" });
+
+    const index = await app.request("/t/q", { headers: { Authorization: "Bearer test-admin-token" } }, env);
+    const metric = await app.request(
+      "/t/q/m/active?from=2026-08-01&to=2026-08-31",
+      { headers: { Authorization: "Bearer test-admin-token" } },
+      env
+    );
+
+    expect(index.status).toBe(200);
+    expect(metric.status).toBe(200);
+  });
+
+  /** 索引是给机器读的自描述：照它给的路径访问必须真能命中 */
+  it("索引自描述的路径带上前缀", async () => {
+    const app = query({ basePath: "/t/q" });
+    const res = await app.request("/t/q", { headers: { Authorization: "Bearer test-admin-token" } }, env);
+    const body = await res.json<{ usage: { metric: string; sql: string } }>();
+
+    expect(body.usage.metric).toContain("/t/q/m/:metric");
+    expect(body.usage.sql).toContain("/t/q/sql");
+  });
+});
+
 describe("指标", () => {
   it("active 按天去重 install", async () => {
     await seed("2026-08-10", "a");

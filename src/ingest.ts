@@ -12,7 +12,7 @@ import type { NormalizedEvent } from "./validate.js";
  * 不重试。4xx 同样出队（服务端已判定无效），只有 5xx 与网络错误才该重试。
  */
 export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
-  const app = new Hono<{ Bindings: TEnv }>();
+  const app = new Hono<{ Bindings: TEnv }>().basePath(config.basePath ?? "");
 
   app.post("/e", async (c) => {
     const env = c.env as TEnv;

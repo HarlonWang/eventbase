@@ -9,6 +9,8 @@ export interface Quotas {
 
 export interface IngestConfig<TEnv> {
   db: (env: TEnv) => D1Database;
+  /** 挂载前缀，如 `/t` → 摄取端点是 `/t/e`。消费方直接 `.fetch()`，不必自建 Hono 做嫁接 */
+  basePath?: string;
   /** 未配置则不校验 App-Key：key 是公开的，只用于路由与关停，不是鉴权 */
   appKeys?: (env: TEnv) => readonly string[] | undefined;
   limiter?: (env: TEnv) => RateLimiter | undefined;

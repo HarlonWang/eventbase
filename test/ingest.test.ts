@@ -244,6 +244,26 @@ describe("辅助表", () => {
   });
 });
 
+describe("挂载前缀", () => {
+  it("带 basePath 时端点在前缀下", async () => {
+    const app = ingest({ basePath: "/t" });
+    const res = await app.request(
+      "/t/e",
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(batch()) },
+      env
+    );
+
+    expect(res.status).toBe(204);
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("带 basePath 后裸路径不再命中——消费方不必自建 Hono 做嫁接", async () => {
+    const res = await post(ingest({ basePath: "/t" }), batch());
+
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("事件幂等 id", () => {
   it("客户端带来的 id 原样落库", async () => {
     await post(ingest(), batch({ events: [{ name: "app_opened", id: "11111111-2222-3333-4444-555555555555" }] }));
