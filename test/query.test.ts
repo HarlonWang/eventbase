@@ -1,3 +1,4 @@
+import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { get, initDb, query, seed, sql, wipeDb } from "./helpers";
 
@@ -65,6 +66,22 @@ describe("指标", () => {
     expect((await get(query(), "/m/nope")).status).toBe(400);
   });
 
+  it("原型链上的属性名不算指标", async () => {
+    for (const name of ["constructor", "toString", "hasOwnProperty"]) {
+      expect((await get(query(), `/m/${name}`)).status).toBe(400);
+    }
+  });
+
+  it("非法日期 400，不落到 D1", async () => {
+    expect((await get(query(), "/m/active?to=nope")).status).toBe(400);
+    expect((await get(query(), "/m/active?from=2026-13-45&to=2026-08-31")).status).toBe(400);
+  });
+
+  it("指标不支持的切片轴 400，而不是静默返回未切片的数", async () => {
+    expect((await get(query(), "/m/retention?by=channel")).status).toBe(400);
+    expect((await get(query(), "/m/events?by=channel")).status).toBe(400);
+  });
+
   it("new_installs 数安装日", async () => {
     await seed("2026-08-10", "a");
     await seed("2026-08-11", "a");
@@ -77,6 +94,16 @@ describe("指标", () => {
       { day: "2026-08-10", value: 1 },
       { day: "2026-08-11", value: 1 },
     ]);
+  });
+
+  it("new_installs 可按 sys_locale 切片——首见时冻结的 locale", async () => {
+    await seed("2026-08-10", "a", "app_opened", { locale: "zh-Hans-CN" });
+    await seed("2026-08-10", "b", "app_opened", { locale: "en-US" });
+
+    const body = await (
+      await get(query(), "/m/new_installs?from=2026-08-01&to=2026-08-31&by=sys_locale")
+    ).json<{ rows: { dim: string }[] }>();
+    expect(body.rows.map((r) => r.dim).sort()).toEqual(["en-US", "zh-Hans-CN"]);
   });
 
   it("events 按事件名拆，可按 name 过滤", async () => {
@@ -99,6 +126,21 @@ describe("指标", () => {
       await get(query(), "/m/retention?from=2026-08-01&to=2026-08-31&n=1")
     ).json<{ rows: { day: string; cohort: number; retained: number }[] }>();
     expect(body.rows).toEqual([{ day: "2026-08-10", cohort: 2, retained: 1 }]);
+  });
+
+  it("retention 的回访分子只认非 debug 的客户端事件", async () => {
+    await seed("2026-08-10", "a");
+    await seed("2026-08-11", "a", "app_opened", { is_debug: 1 });
+    await seed("2026-08-10", "b");
+    await env.DB.prepare(
+      `INSERT INTO events (received_at, event_at, day, name, source, install_id, is_debug)
+       VALUES (0, 0, '2026-08-11', 'checkout_completed', 'server', 'b', 0)`
+    ).run();
+
+    const body = await (
+      await get(query(), "/m/retention?from=2026-08-01&to=2026-08-31&n=1")
+    ).json<{ rows: { retained: number }[] }>();
+    expect(body.rows[0].retained).toBe(0);
   });
 });
 

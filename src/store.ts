@@ -45,22 +45,35 @@ export function eventStatements(
   );
 }
 
-/** 安装日与首次归因冻结在此，避免「新增 install」去扫全历史求 min(day)。 */
-export function firstSeenStatement(db: D1Database, ctx: WriteContext): D1PreparedStatement {
-  const { batch, geo, receivedAt } = ctx;
+/**
+ * 安装日与首次归因冻结在此，避免「新增 install」去扫全历史求 min(day)。
+ * debug 批不写：一台机器可能既跑 debug 又跑正式包，写了就永久钉死在队列表里。
+ */
+export function firstSeenStatement(
+  db: D1Database,
+  events: NormalizedEvent[],
+  ctx: WriteContext
+): D1PreparedStatement | null {
+  const { batch, geo } = ctx;
+  if (batch.sys.debug) return null;
+
+  const firstDay = events.map((e) => dayOf(e.at)).reduce((a, b) => (a < b ? a : b));
   return db
     .prepare(
-      `INSERT OR IGNORE INTO install_first_seen
-         (install_id, first_day, channel, app_version, platform, country)
-       VALUES (?, ?, ?, ?, ?, ?)`
+      `INSERT INTO install_first_seen
+         (install_id, first_day, channel, app_version, platform, country, sys_locale)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(install_id) DO UPDATE
+         SET first_day = MIN(install_first_seen.first_day, excluded.first_day)`
     )
     .bind(
       batch.install,
-      dayOf(receivedAt),
+      firstDay,
       batch.sys.channel ?? null,
       batch.sys.version ?? null,
       batch.sys.platform ?? null,
-      geo.country
+      geo.country,
+      batch.sys.locale ?? null
     );
 }
 
@@ -76,23 +89,25 @@ export function identityStatement(db: D1Database, ctx: WriteContext): D1Prepared
     .bind(batch.install, batch.user, receivedAt, receivedAt);
 }
 
-/**
- * 先计数后写入，返回累计值。限流绑定按 colo 局部计数，跨 colo 的日配额只能落在这里。
- * 超限时事件已被计入但不落库——宁可多计，不做「先读后写」的两次往返。
- */
-export async function bumpQuota(
+/** 只读当日累计，不递增。记账由 quotaStatement 与事件写入同批完成。 */
+export async function readQuota(db: D1Database, day: string, key: string): Promise<number> {
+  const row = await db
+    .prepare(`SELECT n FROM ingest_quota WHERE day = ? AND key = ?`)
+    .bind(day, key)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export function quotaStatement(
   db: D1Database,
   day: string,
   key: string,
   n: number
-): Promise<number> {
-  const row = await db
+): D1PreparedStatement {
+  return db
     .prepare(
       `INSERT INTO ingest_quota (day, key, n) VALUES (?, ?, ?)
-       ON CONFLICT(day, key) DO UPDATE SET n = n + excluded.n
-       RETURNING n`
+       ON CONFLICT(day, key) DO UPDATE SET n = n + excluded.n`
     )
-    .bind(day, key, n)
-    .first<{ n: number }>();
-  return row?.n ?? 0;
+    .bind(day, key, n);
 }

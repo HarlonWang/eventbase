@@ -164,9 +164,11 @@ CREATE TABLE daily_rollup (
 -- 根治的是同一个坑。首次出现时的归因维度在此冻结，用户之后换版本/渠道不影响归因。
 CREATE TABLE install_first_seen (
   install_id  TEXT PRIMARY KEY,
-  first_day   TEXT NOT NULL,
-  channel TEXT, app_version TEXT, platform TEXT, country TEXT
+  first_day   TEXT NOT NULL,   -- 该 install 已接受事件里最小的 day，晚到的更早事件会改小它
+  channel TEXT, app_version TEXT, platform TEXT, country TEXT, sys_locale TEXT
 );
+-- debug 批不写此表：一台机器可能既跑 debug 又跑正式包，写了就永久钉死；
+-- 不写则留存的分母天然干净，比加 is_debug 列少一次迁移。
 
 -- 日配额计数（实现时补，2026-08-19）。限流绑定按 colo 局部计数，跨 colo 的日配额只能落库。
 CREATE TABLE ingest_quota (
@@ -194,7 +196,7 @@ CREATE TABLE dim_identity_daily (
 | body 体积 | ≤ 64 KB | |
 | 事件名 | ≤ 60 字符 | 照 Aptabase |
 | props 键数 / 键长 / 串值 | ≤ 20 / ≤ 40 字符 / 截断 180 | 治基数爆炸 |
-| 时间戳 | 未来 > 10 分钟拒；早于 24 小时拒 | 照 Aptabase，防灌历史数据 |
+| 时间戳 | 未来 > 10 分钟拒；早于 7 天拒 | 防灌历史数据；窗口刻意比 Aptabase 的 24 小时宽，理由见本文「过期窗口」 |
 | 限流 | `limiter.limit({key: install_id})` 60s 窗口，兜底再按 IP 限一层 | Workers 原生绑定，按 colo 局部 |
 | 日配额 | per install + 全局，D1 计数，超了直接丢 | 跨 colo 需汇总，限流绑定做不到 |
 | 返回 | 恒 204，不回传错误细节 | 单条无效只丢那条，其余照收 |
@@ -321,7 +323,7 @@ CREATE TABLE dim_identity_daily (
 | 限流 | 固定窗口 **每 IP 20 请求/秒** |
 | 批量上限 | 单请求最多 **25 条**，超了整个 400 |
 | 字段上限 | 事件名 ≤ 60 字符、property key ≤ 40、字符串值截断 180、locale ≤ 10、DeviceModel ≤ 100 |
-| **时间戳** | 客户端时间未来 > 10 分钟拒、早于 24 小时拒；setter 里把未来时间钳回 now |
+| **时间戳** | 客户端时间未来 > 10 分钟拒、早于 7 天拒；setter 里把未来时间钳回 now |
 | session | sessionId ≤ 36 字符；数字型（内嵌 epoch）未来 > 10 分钟或早于 7 天拒 |
 | 脏数据 | 批量里单条无效只丢那条，其余照收 |
 | 写入 | 事件先进内存 buffer，后台 writer **每 10 秒批量 flush**；flush 失败整批丢弃只记 error |

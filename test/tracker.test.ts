@@ -30,9 +30,12 @@ describe("服务端事件", () => {
 
   it("表不存在也不抛——埋点绝不能成为业务的故障源", async () => {
     await env.DB.prepare("DROP TABLE events").run();
-    expect(() => createTracker(env.DB)({ request }, { name: "quota_blocked" })).not.toThrow();
-    await flushEvents();
-    await initDb();
+    try {
+      expect(() => createTracker(env.DB)({ request }, { name: "quota_blocked" })).not.toThrow();
+      await flushEvents();
+    } finally {
+      await initDb();
+    }
   });
 
   it("waitUntil 存在时把写入挂上去", async () => {

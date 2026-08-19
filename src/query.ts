@@ -21,6 +21,14 @@ const METRICS = {
   retention: "按安装日队列的第 N 日回访率（参数 n，默认 1）",
 } as const;
 
+/** events / retention 的 dim 位分别被事件名与队列占用，见 docs/protocol.md */
+const METRIC_SLICES: Record<keyof typeof METRICS, readonly Slice[]> = {
+  active: SLICE_COLUMNS,
+  new_installs: SLICE_COLUMNS,
+  events: [],
+  retention: [],
+};
+
 export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
   const app = new Hono<{ Bindings: TEnv }>();
   const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS;
@@ -48,16 +56,23 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
 
   app.get("/m/:metric", async (c) => {
     const metric = c.req.param("metric");
-    if (!(metric in METRICS)) return c.json({ error: `unknown metric: ${metric}` }, 400);
+    if (!Object.hasOwn(METRICS, metric)) return c.json({ error: `unknown metric: ${metric}` }, 400);
+    const key = metric as keyof typeof METRICS;
 
     const to = c.req.query("to") ?? dayOf(Date.now());
+    if (!isDay(to)) return c.json({ error: `invalid to: ${to}` }, 400);
     const from = c.req.query("from") ?? shiftDay(to, -DEFAULT_RANGE_DAYS);
+    if (!isDay(from)) return c.json({ error: `invalid from: ${from}` }, 400);
+
     const by = c.req.query("by");
     if (by && !SLICE_COLUMNS.includes(by as Slice)) {
       return c.json({ error: `unknown slice: ${by}` }, 400);
     }
+    if (by && !METRIC_SLICES[key].includes(by as Slice)) {
+      return c.json({ error: `metric ${key} does not support by=${by}` }, 400);
+    }
 
-    const built = build(metric as keyof typeof METRICS, {
+    const built = build(key, {
       from,
       to,
       by: by as Slice | undefined,
@@ -65,11 +80,16 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
       n: Number(c.req.query("n") ?? 1),
     });
 
-    const result = await config
-      .db(c.env as TEnv)
-      .prepare(built.sql)
-      .bind(...built.params)
-      .all();
+    let result;
+    try {
+      result = await config
+        .db(c.env as TEnv)
+        .prepare(built.sql)
+        .bind(...built.params)
+        .all();
+    } catch (e) {
+      return c.json({ error: `query failed: ${(e as Error).message}` }, 500);
+    }
 
     return c.json({ metric, from, to, by: by ?? null, rows: result.results });
   });
@@ -80,10 +100,15 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
     const rejection = rejectUnsafe(sql);
     if (rejection) return c.json({ error: rejection }, 400);
 
-    const result = await config
-      .db(c.env as TEnv)
-      .prepare(`SELECT * FROM (${sql}) LIMIT ${maxRows + 1}`)
-      .all();
+    let result;
+    try {
+      result = await config
+        .db(c.env as TEnv)
+        .prepare(`SELECT * FROM (${sql}) LIMIT ${maxRows + 1}`)
+        .all();
+    } catch (e) {
+      return c.json({ error: `invalid sql: ${(e as Error).message}` }, 400);
+    }
 
     const truncated = result.results.length > maxRows;
     return c.json({ rows: truncated ? result.results.slice(0, maxRows) : result.results, truncated });
@@ -150,11 +175,19 @@ function build(metric: keyof typeof METRICS, args: Args): { sql: string; params:
                                          THEN e.install_id END) AS retained
               FROM install_first_seen f
               LEFT JOIN events e ON e.install_id = f.install_id
+                                AND e.source = 'client' AND e.is_debug = 0
               WHERE f.first_day BETWEEN ? AND ?
               GROUP BY f.first_day ORDER BY day`,
         params: [Number.isFinite(args.n) ? args.n : 1, args.from, args.to],
       };
+
+    default:
+      throw new Error(`unhandled metric: ${metric satisfies never}`);
   }
+}
+
+function isDay(v: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 }
 
 function shiftDay(day: string, delta: number): string {

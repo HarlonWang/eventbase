@@ -22,6 +22,15 @@ describe("摄取", () => {
     expect(JSON.parse(row.props!)).toEqual({ is_cold: true });
   });
 
+  it("events 里的非对象条目只丢那条，不把整批打成 500", async () => {
+    const res = await post(
+      ingest(),
+      batch({ events: [null, "x", 1, { name: "app_opened", at: Date.now() }] })
+    );
+    expect(res.status).toBe(204);
+    expect((await rows()).map((r) => r.name)).toEqual(["app_opened"]);
+  });
+
   it("单条无效只丢那条，其余照收", async () => {
     const now = Date.now();
     await post(
@@ -70,8 +79,11 @@ describe("摄取", () => {
     const at = Date.parse("2026-08-18T16:30:00Z");
     vi.useFakeTimers();
     vi.setSystemTime(at);
-    await post(ingest(), batch({ events: [{ name: "app_opened", at }] }));
-    vi.useRealTimers();
+    try {
+      await post(ingest(), batch({ events: [{ name: "app_opened", at }] }));
+    } finally {
+      vi.useRealTimers();
+    }
 
     expect((await rows())[0].day).toBe("2026-08-19");
   });
@@ -153,6 +165,52 @@ describe("限流与配额", () => {
 });
 
 describe("辅助表", () => {
+  it("first_day 取批内最小的事件日，不是收包时间", async () => {
+    const now = Date.parse("2026-08-19T04:00:00Z");
+    const earlier = Date.parse("2026-08-17T20:00:00Z");
+    vi.useFakeTimers();
+    vi.setSystemTime(now);
+    try {
+      await post(
+        ingest(),
+        batch({
+          events: [
+            { name: "app_opened", at: now },
+            { name: "screen_viewed", at: earlier },
+          ],
+        })
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+
+    const row = await env.DB.prepare("SELECT first_day FROM install_first_seen").first<{
+      first_day: string;
+    }>();
+    expect(row!.first_day).toBe("2026-08-18");
+  });
+
+  it("debug 批不进 install_first_seen——留存分母不含 QA 机器", async () => {
+    await post(
+      ingest(),
+      batch({ sys: { version: "1.3.0", platform: "android", channel: "play", debug: true } })
+    );
+
+    const row = await env.DB.prepare("SELECT COUNT(*) AS n FROM install_first_seen").first<{
+      n: number;
+    }>();
+    expect(row!.n).toBe(0);
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("sys_locale 冻结在 install_first_seen", async () => {
+    await post(ingest(), batch());
+    const row = await env.DB.prepare("SELECT sys_locale FROM install_first_seen").first<{
+      sys_locale: string;
+    }>();
+    expect(row!.sys_locale).toBe("zh-Hans-CN");
+  });
+
   it("install_first_seen 只记首次，归因维度冻结", async () => {
     const app = ingest();
     await post(app, batch());

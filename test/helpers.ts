@@ -1,10 +1,16 @@
 import { env } from "cloudflare:workers";
 import schema from "../migrations/0001_events.sql?raw";
+import locale from "../migrations/0002_install_locale.sql?raw";
 import { createIngest, createQuery } from "../src/index";
 
 export async function initDb() {
-  for (const stmt of schema.split(";").filter((s) => s.trim())) {
-    await env.DB.prepare(stmt).run();
+  for (const stmt of [schema, locale].join(";").split(";").filter((s) => s.trim())) {
+    // ALTER TABLE ADD COLUMN 没有 IF NOT EXISTS，重复 initDb 时只能靠吞这一种错
+    await env.DB.prepare(stmt)
+      .run()
+      .catch((e: Error) => {
+        if (!/duplicate column name/.test(e.message)) throw e;
+      });
   }
 }
 
@@ -95,9 +101,9 @@ export async function seed(day: string, install: string, name = "app_opened", ex
     .bind(at, at, day, name, install, extra.channel ?? "play", extra.platform ?? "android", extra.is_debug ?? 0)
     .run();
   await env.DB.prepare(
-    `INSERT OR IGNORE INTO install_first_seen (install_id, first_day, channel, platform)
-     VALUES (?, ?, ?, ?)`
+    `INSERT OR IGNORE INTO install_first_seen (install_id, first_day, channel, platform, sys_locale)
+     VALUES (?, ?, ?, ?, ?)`
   )
-    .bind(install, day, extra.channel ?? "play", extra.platform ?? "android")
+    .bind(install, day, extra.channel ?? "play", extra.platform ?? "android", extra.locale ?? "zh-Hans-CN")
     .run();
 }

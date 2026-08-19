@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+language: zh-CN
+
+reviews:
+  pre_merge_checks:
+    # 官方门禁只有 mode/threshold，表达不了「仅导出符号」，故关掉，由下面的 path_instructions 承担
+    docstrings:
+      mode: "off"
+  finishing_touches:
+    docstrings:
+      enabled: false
+  path_instructions:
+    - path: "src/**/*.ts"
+      instructions: |
+        本仓的注释准入见 CLAUDE.md「注释准入」，审查时按此判定，不要套用通用的覆盖率标准：
+
+        - **只有导出符号（export 的函数、类型、常量）需要 TSDoc**，且只写「是什么 / 参数 / 返回」，
+          不写「为什么这么设计」——设计论证属于 docs/，不属于源码。
+        - **内部实现（非 export 的函数、局部变量、分支）一律不要求注释**，缺注释不是问题，
+          不要提「建议补充注释以提高可读性」这类意见。
+        - 允许存在的注释只有四类：反直觉的约束、外部契约、踩坑记录（一行 + 日期）、导出符号的 TSDoc。
+        - **复述代码、解释语言机制、分节横幅注释视为缺陷**，请反过来提出删除。
+        - 超过 3 行的解释性注释应改成一行指针（如 `// 见 docs/telemetry-design.md#离线队列`）。
+        - 量化护栏由 `npm run lint:comments` 执行：注释行/总行 ≤ 15%，单函数内注释 ≤ 2 行。
+          不要建议提高阈值。
+    - path: "docs/**"
+      instructions: |
+        docs/protocol.md 是两端契约的唯一权威：实现与它必须同一个 commit 落地。
+        若代码改动涉及协议字段、限制值或响应语义而本文未同步，请指出。
+    - path: "test/**"
+      instructions: |
+        测试用中文描述行为而非实现细节。不要求测试文件有注释或 docstring。

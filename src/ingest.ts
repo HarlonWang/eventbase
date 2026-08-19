@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import type { IngestConfig } from "./config.js";
 import { geoOf } from "./geo.js";
 import { LIMITS } from "./limits.js";
-import { bumpQuota, eventStatements, firstSeenStatement, identityStatement } from "./store.js";
+import { eventStatements, firstSeenStatement, identityStatement, quotaStatement, readQuota } from "./store.js";
 import { dayOf } from "./time.js";
 import { normalizeEvent, parseBatch } from "./validate.js";
 
@@ -48,15 +48,14 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
     if (events.length === 0) return c.body(null, 204);
 
     const db = config.db(env);
-    if (await overQuota(db, config, batch.install, events.length, now)) {
-      return c.body(null, 204);
-    }
+    if (await overQuota(db, config, batch.install, now)) return c.body(null, 204);
 
     const ctx = { batch, geo: geoOf(c.req.raw), receivedAt: now };
     const statements = [
       ...eventStatements(db, events, ctx),
-      firstSeenStatement(db, ctx),
+      firstSeenStatement(db, events, ctx),
       identityStatement(db, ctx),
+      ...quotaStatements(db, config, batch.install, events.length, now),
     ].filter((s) => s !== null);
 
     await db.batch(statements);
@@ -66,11 +65,11 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
   return app;
 }
 
+/** 只读判断，记账跟着事件写入走同一个 batch：触顶的那一批放行一次，下一批才拦。 */
 async function overQuota<TEnv extends object>(
   db: D1Database,
   config: IngestConfig<TEnv>,
   install: string,
-  n: number,
   now: number
 ): Promise<boolean> {
   const quotas = config.quotas;
@@ -78,10 +77,27 @@ async function overQuota<TEnv extends object>(
 
   const day = dayOf(now);
   if (quotas.perInstallPerDay !== undefined) {
-    if ((await bumpQuota(db, day, `install:${install}`, n)) > quotas.perInstallPerDay) return true;
+    if ((await readQuota(db, day, `install:${install}`)) >= quotas.perInstallPerDay) return true;
   }
   if (quotas.totalPerDay !== undefined) {
-    if ((await bumpQuota(db, day, "total", n)) > quotas.totalPerDay) return true;
+    if ((await readQuota(db, day, "total")) >= quotas.totalPerDay) return true;
   }
   return false;
+}
+
+function quotaStatements<TEnv extends object>(
+  db: D1Database,
+  config: IngestConfig<TEnv>,
+  install: string,
+  n: number,
+  now: number
+): D1PreparedStatement[] {
+  const quotas = config.quotas;
+  if (!quotas) return [];
+
+  const day = dayOf(now);
+  const out: D1PreparedStatement[] = [];
+  if (quotas.perInstallPerDay !== undefined) out.push(quotaStatement(db, day, `install:${install}`, n));
+  if (quotas.totalPerDay !== undefined) out.push(quotaStatement(db, day, "total", n));
+  return out;
 }

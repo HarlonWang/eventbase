@@ -75,6 +75,7 @@ export function normalizeEvent(
   now: number,
   allowed?: readonly string[]
 ): NormalizedEvent | null {
+  if (!isRecord(event)) return null;
   const name = str(event.name);
   if (!name || name.length > LIMITS.eventName || !EVENT_NAME_RE.test(name)) return null;
   if (allowed && !allowed.includes(name)) return null;

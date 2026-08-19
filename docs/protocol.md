@@ -21,7 +21,7 @@
 | 参数 | 说明 |
 |---|---|
 | `from` / `to` | `YYYY-MM-DD`，默认最近 14 天 |
-| `by` | 切片轴，白名单：`channel` / `platform` / `app_version` / `sys_locale` / `country` |
+| `by` | 切片轴，白名单：`channel` / `platform` / `app_version` / `sys_locale` / `country`。**按指标可用**：`active` / `new_installs` 支持全部五项（`new_installs` 用首见时冻结的值）；`events` 与 `retention` 暂不支持切片（dim 位分别被事件名与队列占用）。指标不支持的轴返回 400，不静默返回未切片的数 |
 | `name` | 仅 `events` 指标：按事件名过滤 |
 | `n` | 仅 `retention` 指标：第 N 日回访，默认 1 |
 
@@ -67,7 +67,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 | `at` 未来 | > 10 分钟 | 丢该条 |
 | `at` 过期 | > 7 天 | 丢该条 |
 | 限流 | 每 install 60 秒 60 条；每 IP 60 秒 600 条 | 丢弃，仍返回 204 |
-| 日配额 | 每 install 2000；全局 50 万 | 丢弃，仍返回 204 |
+| 日配额 | 每 install 2000；全局 50 万 | 丢弃，仍返回 204。记账与事件写入同批提交，**触顶的那一批放行一次，下一批才拦** |
 
 单条无效**只丢那条**，其余照收。
 
@@ -90,6 +90,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 | `event_at` | 客户端声明时间，即请求里的 `at`；只用于排序与时钟纠偏 |
 | `received_at` | 服务端接收时间，**分析默认用它** |
 | `day` | `'YYYY-MM-DD'`，**按 `event_at` 以 UTC+8 日界计算** |
+| `first_day` | install 的安装日，取该 install 已接受事件里**最小的 `day`**；晚到的更早事件会把它改小。`sys.debug` 为 true 的批不写入此表 |
 
 `day` 取 `event_at` 而非 `received_at`，否则离线补报会被记到上报当天，活跃日与留存队列失真。代价是历史日期的数字会被晚到事件追加修改，故**读数以 T+2 为准**。
 
