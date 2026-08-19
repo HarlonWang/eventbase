@@ -192,8 +192,8 @@ describe("丢弃读数", () => {
     ]);
   });
 
-  /** 白名单漏登记新表，运维就查不了它——ingest_drops 上线冒烟时才暴露过一次 */
-  it("ingest_drops 在 SQL 白名单里", async () => {
+  /** 2026-08-19 上线冒烟：这条查询当时被表白名单挡下，丢弃计数读不出来 */
+  it("查询 ingest_drops 返回成功", async () => {
     const res = await sql(query(), "SELECT COUNT(*) AS n FROM ingest_drops");
 
     expect(res.status).toBe(200);

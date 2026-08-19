@@ -128,14 +128,7 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
 const WRITE_KEYWORDS = /\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum)\b/i;
 const BANNED_CALLS = /\b(load_extension|randomblob|zeroblob)\s*\(/i;
 
-/**
- * 所有检查只看**骨架**——剥掉字符串字面量与注释后的 SQL。护栏只保两条底线：
- * **只读**（单语句 + 首词 + 写关键字，三者缺一不可）与**不拖垮**（递归 CTE、危险函数）。
- *
- * 刻意**不做表白名单**：本库只有埋点表，schema 随 npm 包公开，调用方已持 admin token——
- * 拦不到有价值的东西，却要养一套正则 SQL 表名解析器，还会因漏登记新表挡住正当查询
- * （2026-08-19 上线冒烟即撞上 ingest_drops）。爆炸半径由拆库限住：业务数据在另一个库。
- */
+/** 护栏清单与「为什么不做表白名单」见 docs/protocol.md 的「取数」一节 */
 function rejectUnsafe(sql: string): string | null {
   if (!sql) return "sql is required";
 
