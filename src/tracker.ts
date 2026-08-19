@@ -28,11 +28,25 @@ export async function flushEvents(): Promise<void> {
 }
 
 /**
- * 服务端事件不走 HTTP，直接写 D1。写入失败一律吞掉——埋点绝不能成为业务的故障源。
- * 判据：漏斗末端落在业务库的，补发 server 事件，不靠跨库 JOIN。
+ * 服务端事件 writer：不走 HTTP，直接写 D1。返回的函数**永不抛**，也不返回结果。
+ * 何时该补发 server 事件见 docs/telemetry-design.md 的「起步要补发的 server 事件」。
  */
 export function createTracker(db: D1Database, options: TrackerOptions = {}) {
   return (ctx: TrackContext, event: ServerEvent): void => {
+    try {
+      write(db, options, ctx, event);
+    } catch (error) {
+      report(options, error);
+    }
+  };
+}
+
+function write(
+  db: D1Database,
+  options: TrackerOptions,
+  ctx: TrackContext,
+  event: ServerEvent
+): void {
     const now = Date.now();
     const geo = geoOf(ctx.request);
     const promise = db
@@ -57,14 +71,20 @@ export function createTracker(db: D1Database, options: TrackerOptions = {}) {
         event.props ? JSON.stringify(event.props) : null
       )
       .run()
-      .catch((error: unknown) => {
-        if (warned || !options.onError) return;
-        warned = true;
-        options.onError(error);
-      });
+      .catch((error: unknown) => report(options, error));
 
     const tracked = promise.finally(() => pending.delete(tracked));
     pending.add(tracked);
     ctx.waitUntil?.(tracked);
-  };
+}
+
+/** 整个进程只回调一次：故障期每个请求都触发回调，本身就会变成新的故障源 */
+function report(options: TrackerOptions, error: unknown): void {
+  if (warned || !options.onError) return;
+  warned = true;
+  try {
+    options.onError(error);
+  } catch {
+    // 消费方的 onError 自己抛，同样不能外泄
+  }
 }
