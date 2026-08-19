@@ -62,6 +62,8 @@ scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须�
 4. ⬜ 取数 SQL 集与对账（`chat_logs` 残差、Aptabase 并行期量级、事件覆盖差集）
 5. ⬜ loginbase 改用本库（登录事件合表，`auth_events` 退役）
 
+**发布**：`publishConfig.provenance = false` —— provenance **不支持私有仓**（官方原话：private repository 即使发公开包也不行），而 trusted publishing 默认会自动生成 provenance，不关掉的话 CI 发布会卡在那一步。仓库转 public 后应把这行删掉，provenance 是白拿的安全属性。
+
 **遗留运维项**：npm trusted publisher 未配（发布仍靠手动 + OTP）；`0.1.2` 是坏版本待 deprecate；生产库里有一条冒烟数据（`channel='smoke'`），分析时排除。
 
 ## 设计红线
