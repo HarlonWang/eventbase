@@ -10,9 +10,24 @@
 | 方法 | 路径 | 鉴权 | 用途 |
 |---|---|---|---|
 | `POST` | `<prefix>/e` | `App-Key` 头（公开，可反编译，仅用于路由与开关） | 批量上报 |
-| `GET` | `<prefix>/q` | `Authorization: Bearer <admin token>` | 取数（固定指标 + 受限 SELECT） |
+| `GET` | `<queryPrefix>/` | `Authorization: Bearer <admin token>` | 取数索引（自描述：可用指标、切片轴、用法） |
+| `GET` | `<queryPrefix>/m/:metric` | 同上 | 固定指标 |
+| `POST` | `<queryPrefix>/sql` | 同上 | 受限单条 SELECT / WITH |
 
-`<prefix>` 由消费方挂载时决定，TrendingAI 用 `/t`。
+前缀由消费方挂载时决定，TrendingAI 用 `/t`（摄取）与 `/t/q`（取数）。摄取与取数是两个 factory：`createIngest` 与 `createQuery`，可分别挂载或只挂其一。
+
+## 取数
+
+| 参数 | 说明 |
+|---|---|
+| `from` / `to` | `YYYY-MM-DD`，默认最近 14 天 |
+| `by` | 切片轴，白名单：`channel` / `platform` / `app_version` / `sys_locale` / `country` |
+| `name` | 仅 `events` 指标：按事件名过滤 |
+| `n` | 仅 `retention` 指标：第 N 日回访，默认 1 |
+
+v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装日队列）、`events`（按事件名计数）、`retention`（安装日队列的第 N 日回访）。
+
+`POST /sql` 的护栏：单条语句（含 `;` 即拒）、必须以 `SELECT` 或 `WITH` 开头、写类关键字一律拒、结果封顶 `maxRows`（默认 1000，超出截断并返回 `truncated: true`）。**未配置 `adminToken` 时整个取数面返回 404**——宁可没有这个面，也不要一个没有门的读接口。
 
 ## 上报请求体
 

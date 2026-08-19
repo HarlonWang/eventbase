@@ -1,6 +1,6 @@
 import { env } from "cloudflare:workers";
 import schema from "../migrations/0001_events.sql?raw";
-import { createIngest } from "../src/index";
+import { createIngest, createQuery } from "../src/index";
 
 export async function initDb() {
   for (const stmt of schema.split(";").filter((s) => s.trim())) {
@@ -60,4 +60,44 @@ export interface EventRow {
 export async function rows(): Promise<EventRow[]> {
   const result = await env.DB.prepare("SELECT * FROM events ORDER BY id").all<EventRow>();
   return result.results;
+}
+
+export function query(overrides: Record<string, unknown> = {}) {
+  return createQuery<Cloudflare.Env>({
+    db: (e) => e.DB,
+    adminToken: () => "test-admin-token",
+    ...overrides,
+  } as Parameters<typeof createQuery<Cloudflare.Env>>[0]);
+}
+
+export function get(app: ReturnType<typeof query>, path: string, token = "test-admin-token") {
+  return app.request(path, { headers: { Authorization: `Bearer ${token}` } }, env);
+}
+
+export function sql(app: ReturnType<typeof query>, statement: string, token = "test-admin-token") {
+  return app.request(
+    "/sql",
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ sql: statement }),
+    },
+    env
+  );
+}
+
+export async function seed(day: string, install: string, name = "app_opened", extra: Record<string, unknown> = {}) {
+  const at = Date.parse(`${day}T04:00:00Z`);
+  await env.DB.prepare(
+    `INSERT INTO events (received_at, event_at, day, name, source, install_id, channel, platform, is_debug)
+     VALUES (?, ?, ?, ?, 'client', ?, ?, ?, ?)`
+  )
+    .bind(at, at, day, name, install, extra.channel ?? "play", extra.platform ?? "android", extra.is_debug ?? 0)
+    .run();
+  await env.DB.prepare(
+    `INSERT OR IGNORE INTO install_first_seen (install_id, first_day, channel, platform)
+     VALUES (?, ?, ?, ?)`
+  )
+    .bind(install, day, extra.channel ?? "play", extra.platform ?? "android")
+    .run();
 }
