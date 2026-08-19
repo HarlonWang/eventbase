@@ -33,7 +33,8 @@ const METRIC_SLICES: Record<keyof typeof METRICS, readonly Slice[]> = {
 };
 
 export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
-  const app = new Hono<{ Bindings: TEnv }>().basePath(config.basePath ?? "");
+  const prefix = config.basePath ?? "";
+  const app = new Hono<{ Bindings: TEnv }>().basePath(prefix);
   const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS;
 
   app.use("*", async (c, next) => {
@@ -50,8 +51,9 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
       metrics: METRICS,
       slices: SLICE_COLUMNS,
       usage: {
-        metric: "GET /m/:metric?from=YYYY-MM-DD&to=YYYY-MM-DD&by=<slice>&name=<event>&n=<days>",
-        sql: "POST /sql  { \"sql\": \"SELECT ...\" } — 只读单条 SELECT/WITH",
+        // 带上前缀：索引是给机器读的自描述，路径不对就等于没有
+        metric: `GET ${prefix}/m/:metric?from=YYYY-MM-DD&to=YYYY-MM-DD&by=<slice>&name=<event>&n=<days>`,
+        sql: `POST ${prefix}/sql  { "sql": "SELECT ..." } — 只读单条 SELECT/WITH`,
         defaults: { range: `${DEFAULT_RANGE_DAYS} 天`, maxRows },
       },
     })
