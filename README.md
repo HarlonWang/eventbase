@@ -53,13 +53,16 @@ scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须�
 
 ## 状态
 
-**摄取端已实现**（2026-08-19），L1~L4 四层定稿见 `docs/telemetry-design.md`。落地顺序：
+**服务端已上线并在生产验证**（2026-08-19）。L1~L4 四层定稿见 `docs/telemetry-design.md`。落地顺序：
 
-1. ✅ 服务端库：摄取端点（`createIngest`）、服务端 writer（`createTracker`）、取数端点（`createQuery`）、migration、限流/配额、丢弃计数、事件幂等 id——71 个测试。前缀由 `basePath` 传入，消费方无需自建 Hono
-2. KMP 客户端库：install_id、批量、持久化队列、重试、生命周期事件
-3. TrendingAI 接入：换掉 Aptabase + 按新词汇重构调用点
-4. 取数 SQL 集
-5. loginbase 改用本库（登录事件合表，`auth_events` 退役）
+1. ✅ 服务端库：摄取（`createIngest`）、服务端 writer（`createTracker`）、取数（`createQuery`）、migration、限流/配额、丢弃计数、事件幂等 id——75 个测试。前缀由 `basePath` 传入，消费方无需自建 Hono
+   - ✅ **已部署**：D1 `trending-events`（APAC，0001~0004 已应用）；`api.trendingai.cn/t/e` 摄取、`/t/q` 取数；生产七项复验全过（丢弃读数、元信息放开、只读底线、递归 CTE 熔断、字符串不误杀）
+2. ✅ KMP 客户端库（`eventbase-kt`）：install_id、批量、落盘队列、重试、生命周期事件、诊断日志、幂等 id——44 个测试，Android + iOS 两端编译通过
+3. ⬜ **TrendingAI 接入（下一步）**：composite build 接 `eventbase-kt` → 替换 `platformTrackEvent` → **约 130 个调用点按 §12.9 的 19 个事件重构** → 真机演练（断网 5 下 / 杀进程 / 旋转屏幕，用 `adb logcat -s eventbase:D` 与取数接口三处对账）
+4. ⬜ 取数 SQL 集与对账（`chat_logs` 残差、Aptabase 并行期量级、事件覆盖差集）
+5. ⬜ loginbase 改用本库（登录事件合表，`auth_events` 退役）
+
+**遗留运维项**：npm trusted publisher 未配（发布仍靠手动 + OTP）；`0.1.2` 是坏版本待 deprecate；生产库里有一条冒烟数据（`channel='smoke'`），分析时排除。
 
 ## 设计红线
 
