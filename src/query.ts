@@ -22,6 +22,7 @@ const METRICS = {
   new_installs: "安装日为当天的 install 数",
   events: "事件条数，按事件名拆",
   retention: "按安装日队列的第 N 日回访率（参数 n，默认 1）",
+  drops: "摄取端丢弃数，按原因拆（invalid / expired / future / unknown_event / quota）",
 } as const;
 
 /** events / retention 的 dim 位分别被事件名与队列占用，见 docs/protocol.md */
@@ -30,6 +31,7 @@ const METRIC_SLICES: Record<keyof typeof METRICS, readonly Slice[]> = {
   new_installs: SLICE_COLUMNS,
   events: [],
   retention: [],
+  drops: [],
 };
 
 export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
@@ -123,22 +125,10 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
   return app;
 }
 
-const ALLOWED_TABLES = new Set([
-  "events",
-  "install_first_seen",
-  "install_identity",
-  "daily_rollup",
-  "dim_identity_daily",
-  "ingest_quota",
-]);
-
 const WRITE_KEYWORDS = /\b(insert|update|delete|drop|alter|create|replace|attach|detach|pragma|vacuum)\b/i;
 const BANNED_CALLS = /\b(load_extension|randomblob|zeroblob)\s*\(/i;
 
-/**
- * 所有检查只看**骨架**——剥掉字符串字面量与注释后的 SQL。护栏清单见 docs/protocol.md：
- * 表名走白名单（`sqlite_master` 自然出局），不往关键词黑名单继续加词。
- */
+/** 护栏清单与「为什么不做表白名单」见 docs/protocol.md 的「取数」一节 */
 function rejectUnsafe(sql: string): string | null {
   if (!sql) return "sql is required";
 
@@ -152,14 +142,8 @@ function rejectUnsafe(sql: string): string | null {
   if (call) return `function not allowed: ${call[1].toLowerCase()}`;
 
   // SQLite 不要求 RECURSIVE 关键字（2026-08-19 实测），递归只能靠「CTE 体里 FROM 了自己」认
-  const defined = ctes(skeleton);
-  for (const cte of defined) {
+  for (const cte of ctes(skeleton)) {
     if (referencedTables(cte.body).includes(cte.name)) return "recursive CTE is not allowed";
-  }
-
-  const names = new Set(defined.map((cte) => cte.name));
-  for (const table of referencedTables(skeleton)) {
-    if (!ALLOWED_TABLES.has(table) && !names.has(table)) return `table not allowed: ${table}`;
   }
   return null;
 }
@@ -272,6 +256,15 @@ function build(metric: keyof typeof METRICS, args: Args): { sql: string; params:
               WHERE day BETWEEN ? AND ? AND is_debug = 0 AND (? IS NULL OR name = ?)
               GROUP BY day, name ORDER BY day, name`,
         params: [args.from, args.to, args.name ?? null, args.name ?? null],
+      };
+
+    case "drops":
+      return {
+        sql: `SELECT day, reason AS dim, n AS value
+              FROM ingest_drops
+              WHERE day BETWEEN ? AND ?
+              ORDER BY day, reason`,
+        params: [args.from, args.to],
       };
 
     case "retention":

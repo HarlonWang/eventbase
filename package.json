@@ -1,6 +1,6 @@
 {
   "name": "@whlong/eventbase",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Self-hosted app analytics on Cloudflare Workers + D1: batched ingestion, typed query endpoint, as a Hono sub-app factory.",
   "type": "module",
   "license": "MIT",
