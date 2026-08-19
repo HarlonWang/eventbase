@@ -30,7 +30,8 @@
     "migrations"
   ],
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": false
   },
   "sideEffects": false,
   "scripts": {
