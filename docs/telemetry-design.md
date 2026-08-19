@@ -404,13 +404,13 @@ CREATE TABLE dim_identity_daily (
 | GitHub 客户端仓 | `HarlonWang/eventbase-kt` | ✅ 可用 |
 | Maven | `wang.harlon:eventbase-kt` | ✅ 自有 namespace |
 | Kotlin 包 | `wang.harlon.eventbase` | ✅ |
-| **npm** | **`@harlonwang/eventbase`**（scoped） | 裸名 `eventbase` 被占 |
+| **npm** | **`@whlong/eventbase`**（scoped） | 裸名 `eventbase` 被占 |
 
 **只有 npm 裸名有冲突**：`eventbase` 是 2014 年的老包（JacksonTian，共 2 个版本，最后动过是 2022，近一月 9 次下载），实质废弃但 npm 不会自动回收。选 scoped 而非 `eventbase-cf` 这类后缀，因为 scope 是自有命名空间、永远不会再被抢，且名字本身保持干净。
 
 **裸名已去信询问（2026-08-18 已发）**：收件人 Jackson Tian（朴灵）`shyvo1987@gmail.com`，信里给出了对方唯一要做的动作 `npm owner add whlong eventbase`（我方 npm 用户名 `whlong`，与 loginbase 同账号）。npm 官方的名字争议流程要 4 周且要求原作者失联，是最后手段，未启用。
 
-**不等回复**：直接按 `@harlonwang/eventbase` 开工，消费方目前只有自己、改名成本几乎为零。**若日后拿到裸名，从 `1.0.0` 起发**（不接着旧包的 0.0.3），并在 README 写明「本包自 1.0.0 起为全新项目」，避免旧包的存量用户误装。
+**不等回复**：直接按 `@whlong/eventbase` 开工，消费方目前只有自己、改名成本几乎为零。**若日后拿到裸名，从 `1.0.0` 起发**（不接着旧包的 0.0.3），并在 README 写明「本包自 1.0.0 起为全新项目」，避免旧包的存量用户误装。
 
 ### 13.6 安全与运维
 
@@ -422,7 +422,7 @@ CREATE TABLE dim_identity_daily (
 
 1. 保留期 → 13.2：**永久保留，不做 purge**；
 2. 用户开关 → 13.1：**先不给**，敞口已记录，随时可加；
-3. 命名 → 13.5：**eventbase**，npm 走 `@harlonwang/eventbase`。
+3. 命名 → 13.5：**eventbase**，npm 走 `@whlong/eventbase`。
 
 ## 14. 待议清单
 
@@ -447,7 +447,7 @@ CREATE TABLE dim_identity_daily (
 - ~~保留期与 purge~~ → 13.2 已定：**明细永久保留、不做 purge**；遗留监控项：库体积超 5 GB 时重新评估
 - ~~摄取端是公开写入口，滥用面防护是硬要求~~ → 草案已落第 7 节；仍未定的是具体阈值（每 IP / 每 install 的 limit、日配额数值）与白名单开启时机
 - ~~隐私：IP 存不存、Play 数据安全表单更新~~ → 13.1：IP/UA 都不存；表单要按「与身份关联」申报；用户开关待拍
-- ~~命名~~ → 13.5 已定：**eventbase**（npm 用 scoped `@harlonwang/eventbase`，裸名被 2014 年废弃包占用）
+- ~~命名~~ → 13.5 已定：**eventbase**（npm 用 scoped `@whlong/eventbase`，裸名被 2014 年废弃包占用）
 
 **L5 之后**
 - 摄取端拆独立 Worker（可逆、1~1.5 小时，触发判据见 4.5）

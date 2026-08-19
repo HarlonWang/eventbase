@@ -35,12 +35,17 @@ eventbase-kt/                # 姊妹仓：KMP 客户端库（独立版本线与
 ```
 服务端仓     HarlonWang/eventbase          （含 protocol.md，协议唯一权威）
 客户端仓     HarlonWang/eventbase-kt
-npm         @harlonwang/eventbase
+npm         @whlong/eventbase
 Maven       wang.harlon:eventbase-kt
 Kotlin 包    wang.harlon.eventbase
 ```
 
 npm 裸名 `eventbase` 被 2014 年的废弃包占用，已去信询问转让；未拿到前用 scoped 名。
+scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须对应已存在的 npm 用户或组织。
+
+**0.1.0 是本地手动发布的一次性例外**，没有对应 tag：`publish.yml` 由 tag 触发，
+而 npm 侧的 trusted publisher 尚未配置，打 tag 只会留下一次注定失败的 CI 运行。
+配好之后从下一个版本起走 CI 发布。
 
 ## 状态
 

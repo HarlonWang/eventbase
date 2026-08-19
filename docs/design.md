@@ -160,7 +160,7 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 npx wrangler d1 create <app>-telemetry                      # 1. 建库
 # 2. wrangler.toml：加 d1 binding（migrations_dir 指向 node_modules）+ ratelimit binding
 npx wrangler d1 migrations apply <app>-telemetry --remote   # 3. 迁移
-npm i <包>                                                  # 4. 装包，index.js 加 3 行挂载 /t
+npm i @whlong/eventbase                                     # 4. 装包，index.js 加 3 行挂载 /t
 npx wrangler secret put EVENTBASE_ADMIN_TOKEN               # 5. 取数 token
 ```
 
@@ -168,7 +168,7 @@ npx wrangler secret put EVENTBASE_ADMIN_TOKEN               # 5. 取数 token
 [[d1_databases]]
 binding = "EVENTS_DB"
 database_name = "trending-events"
-migrations_dir = "node_modules/<包>/migrations"   # 免复制迁移文件，升级包即带新迁移
+migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移文件，升级包即带新迁移
 ```
 
 **两处刻意降低接入门槛**（与 loginbase 的既有做法不同，理由是埋点库是全新独立库、迁移完全由包拥有）：
