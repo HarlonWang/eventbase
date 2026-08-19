@@ -3,6 +3,7 @@ export const LIMITS = {
   batchEvents: 25,
   bodyBytes: 64 * 1024,
   eventName: 60,
+  eventIdChars: 36,
   propKeys: 20,
   propKeyChars: 40,
   propValueChars: 180,

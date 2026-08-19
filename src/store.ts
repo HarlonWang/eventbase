@@ -29,9 +29,9 @@ export function eventStatements(
   const { batch, geo, receivedAt } = ctx;
   const insert = db.prepare(
     `INSERT INTO events
-       (received_at, event_at, day, name, source, install_id, user_id, session_id, flow_id,
+       (received_at, event_at, day, name, source, event_id, install_id, user_id, session_id, flow_id,
         app_version, platform, channel, sys_locale, country, asn, colo, timezone, is_debug, props)
-     VALUES (?, ?, ?, ?, 'client', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, 'client', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   return events.map((e) =>
@@ -40,6 +40,7 @@ export function eventStatements(
       e.at,
       dayOf(e.at),
       e.name,
+      e.id,
       batch.install,
       batch.user ?? null,
       batch.session,
