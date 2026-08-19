@@ -244,6 +244,38 @@ describe("辅助表", () => {
   });
 });
 
+describe("事件幂等 id", () => {
+  it("客户端带来的 id 原样落库", async () => {
+    await post(ingest(), batch({ events: [{ name: "app_opened", id: "11111111-2222-3333-4444-555555555555" }] }));
+
+    const row = await env.DB.prepare("SELECT event_id FROM events").first<{ event_id: string }>();
+    expect(row?.event_id).toBe("11111111-2222-3333-4444-555555555555");
+  });
+
+  it("没带 id 也照收——旧客户端不能因此被拒", async () => {
+    const res = await post(ingest(), batch());
+
+    expect(res.status).toBe(204);
+    const row = await env.DB.prepare("SELECT event_id FROM events").first<{ event_id: string | null }>();
+    expect(row?.event_id).toBeNull();
+  });
+
+  it("超长 id 截断而不是丢弃整条", async () => {
+    await post(ingest(), batch({ events: [{ name: "app_opened", id: "x".repeat(80) }] }));
+
+    const row = await env.DB.prepare("SELECT event_id FROM events").first<{ event_id: string }>();
+    expect(row?.event_id.length).toBe(36);
+  });
+
+  it("重复 id 当前照收——先观察重复率，不建唯一索引", async () => {
+    const app = ingest();
+    await post(app, batch({ events: [{ name: "app_opened", id: "dup" }] }));
+    await post(app, batch({ events: [{ name: "app_opened", id: "dup" }] }));
+
+    expect(await rows()).toHaveLength(2);
+  });
+});
+
 describe("丢弃计数", () => {
   async function drops(): Promise<Record<string, number>> {
     const result = await env.DB.prepare("SELECT reason, n FROM ingest_drops").all<{ reason: string; n: number }>();

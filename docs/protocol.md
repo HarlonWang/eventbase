@@ -59,6 +59,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
   },
   "events": [
     {
+      "id": "uuid-v4",           // 可选，幂等 id；缺失照收
       "name": "content_opened",  // ≤ 60 字符，snake_case
       "at": 1755500000000,       // 客户端时间，UTC ms
       "flow": "uuid-v4",         // 可选，跨端漏斗串联
@@ -75,6 +76,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 | 单批事件数 | ≤ 25 | 整个请求 400 |
 | body 体积 | ≤ 64 KB | 413 |
 | 事件名 | ≤ 60 字符 | 丢该条 |
+| 事件 `id` | ≤ 36 字符 | 截断，不丢 |
 | props 键数 | ≤ 20 | 丢该条 |
 | props 键长 | ≤ 40 字符 | 丢该条 |
 | props 字符串值 | 截断至 180 字符 | 截断，不丢 |
@@ -130,6 +132,16 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 同一张表，`source='server'`，不经 HTTP：消费方在自己的 Worker 里用 `createTracker({ db })` 直接写 D1。地理六项取自 `request.cf`，因此 writer 必须能拿到请求上下文。
 
 判据：**漏斗末端落在业务库的，一律补发 server 事件，不靠跨库 JOIN**。
+
+## 幂等 id
+
+每条事件可带 `id`（客户端生成的 uuid），服务端原样落 `events.event_id`。**当前刻意不建唯一索引、不去重**——
+先用 `SELECT event_id, COUNT(*) ... GROUP BY event_id HAVING COUNT(*) > 1` 观察真实重复率，确认值得治再动。
+
+理由：唯一索引会让含重复项的整批 INSERT 失败，而 `db.batch` 是单事务——那等于把「重复几条」升级成
+「整批丢失」，比重复本身糟得多。重复的来源是客户端 `persist()` 两次写非原子的窗口（见 review-findings.md）。
+
+字段缺失照收：不带 `id` 的客户端不能因此被拒。
 
 ## 兼容策略
 

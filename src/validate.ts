@@ -9,6 +9,7 @@ export interface IncomingSys {
 }
 
 export interface IncomingEvent {
+  id?: unknown;
   name?: unknown;
   at?: unknown;
   flow?: unknown;
@@ -24,6 +25,7 @@ export interface IncomingBatch {
 }
 
 export interface NormalizedEvent {
+  id: string | null;
   name: string;
   at: number;
   flow: string | null;
@@ -87,7 +89,13 @@ export function normalizeEvent(
   if (at > now + LIMITS.futureMs) return "future";
   if (at < now - LIMITS.pastMs) return "expired";
 
-  return { name, at, flow: str(event.flow) ?? null, props: normalizeProps(event.props) };
+  return {
+    id: str(event.id)?.slice(0, LIMITS.eventIdChars) ?? null,
+    name,
+    at,
+    flow: str(event.flow) ?? null,
+    props: normalizeProps(event.props),
+  };
 }
 
 function normalizeProps(raw: unknown): string | null {
