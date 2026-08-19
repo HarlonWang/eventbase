@@ -5,4 +5,4 @@ export { LIMITS } from "./limits.js";
 export { dayOf } from "./time.js";
 export type { IngestConfig, Quotas, RateLimiter } from "./config.js";
 export type { QueryConfig } from "./query.js";
-export type { ServerEvent, TrackContext } from "./tracker.js";
+export type { ServerEvent, TrackContext, TrackerOptions } from "./tracker.js";

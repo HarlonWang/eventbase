@@ -14,7 +14,13 @@ export interface TrackContext {
   waitUntil?: (promise: Promise<unknown>) => void;
 }
 
+export interface TrackerOptions {
+  /** 写入失败时回调。**整个进程只回调一次**，避免故障期每个请求都触发；不配置则完全静默 */
+  onError?: (error: unknown) => void;
+}
+
 const pending = new Set<Promise<unknown>>();
+let warned = false;
 
 /** 供测试等待异步写入；生产路径走 waitUntil。 */
 export async function flushEvents(): Promise<void> {
@@ -25,7 +31,7 @@ export async function flushEvents(): Promise<void> {
  * 服务端事件不走 HTTP，直接写 D1。写入失败一律吞掉——埋点绝不能成为业务的故障源。
  * 判据：漏斗末端落在业务库的，补发 server 事件，不靠跨库 JOIN。
  */
-export function createTracker(db: D1Database) {
+export function createTracker(db: D1Database, options: TrackerOptions = {}) {
   return (ctx: TrackContext, event: ServerEvent): void => {
     const now = Date.now();
     const geo = geoOf(ctx.request);
@@ -51,7 +57,11 @@ export function createTracker(db: D1Database) {
         event.props ? JSON.stringify(event.props) : null
       )
       .run()
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (warned || !options.onError) return;
+        warned = true;
+        options.onError(error);
+      });
 
     const tracked = promise.finally(() => pending.delete(tracked));
     pending.add(tracked);

@@ -128,6 +128,14 @@ describe("指标", () => {
     expect(body.rows).toEqual([{ day: "2026-08-10", cohort: 2, retained: 1 }]);
   });
 
+  it("n 必须是 0..90 的整数", async () => {
+    for (const n of ["1e12", "-1", "1.5", "nope", "91"]) {
+      expect((await get(query(), `/m/retention?n=${n}`)).status).toBe(400);
+    }
+    expect((await get(query(), "/m/retention?n=0")).status).toBe(200);
+    expect((await get(query(), "/m/retention?n=90")).status).toBe(200);
+  });
+
   it("retention 的回访分子只认非 debug 的客户端事件", async () => {
     await seed("2026-08-10", "a");
     await seed("2026-08-11", "a", "app_opened", { is_debug: 1 });
@@ -173,6 +181,75 @@ describe("受限 SQL", () => {
 
   it("多语句拒绝——防夹带写操作", async () => {
     expect((await sql(query(), "SELECT 1; DELETE FROM events")).status).toBe(400);
+  });
+
+  it("字面量与注释里的关键词不再误杀正当查询", async () => {
+    await seed("2026-08-10", "a");
+    for (const statement of [
+      "SELECT COUNT(*) AS n FROM events WHERE props LIKE '%update%'",
+      "SELECT COUNT(*) AS n FROM events WHERE name = 'delete_account'",
+      "SELECT COUNT(*) AS n FROM events -- insert 说明\n",
+      "SELECT COUNT(*) AS n /* drop table events */ FROM events",
+      "SELECT COUNT(*) AS n FROM events WHERE name LIKE '%;%'",
+    ]) {
+      expect([statement, (await sql(query(), statement)).status]).toEqual([statement, 200]);
+    }
+  });
+
+  it("骨架剥离后，藏在字面量/注释里的语句仍拦得住真的写操作", async () => {
+    expect((await sql(query(), "SELECT 1 /* x */; DELETE FROM events")).status).toBe(400);
+  });
+
+  it("表名白名单：元信息表读不到", async () => {
+    for (const statement of [
+      "SELECT sql FROM sqlite_master",
+      'SELECT sql FROM "sqlite_master"',
+      "SELECT * FROM pragma_table_info('events')",
+      "SELECT * FROM events JOIN sqlite_master ON 1 = 1",
+    ]) {
+      expect((await sql(query(), statement)).status).toBe(400);
+    }
+  });
+
+  it("递归 CTE 拒绝——省略 RECURSIVE 也拦得住", async () => {
+    for (const bomb of [
+      "WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1e8) SELECT COUNT(*) FROM c",
+      "WITH c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1e8) SELECT COUNT(*) FROM c",
+      "WITH c AS (SELECT 1 AS x UNION ALL SELECT x + 1 FROM c WHERE x < 1e8) SELECT COUNT(*) FROM c",
+    ]) {
+      expect([bomb, (await sql(query(), bomb)).status]).toEqual([bomb, 400]);
+    }
+  });
+
+  it("非递归的 CTE 写法不被误杀", async () => {
+    for (const statement of [
+      "WITH c(n) AS (SELECT 1) SELECT * FROM c",
+      "WITH a AS (SELECT 1 AS n), b AS (SELECT * FROM a) SELECT * FROM b",
+      "WITH a AS MATERIALIZED (SELECT 1 AS n) SELECT * FROM a",
+      "WITH day AS (SELECT day FROM events) SELECT * FROM day",
+    ]) {
+      expect([statement, (await sql(query(), statement)).status]).toEqual([statement, 200]);
+    }
+  });
+
+  it("schema 限定名：既不绕过白名单，也不被误杀", async () => {
+    expect((await sql(query(), "SELECT COUNT(*) AS n FROM main.events")).status).toBe(200);
+    expect((await sql(query(), "SELECT sql FROM main.sqlite_master")).status).toBe(400);
+  });
+
+  it("撑内存与加载扩展的函数拒绝", async () => {
+    for (const statement of [
+      "SELECT hex(randomblob(100000000))",
+      "SELECT zeroblob(100000000)",
+      "SELECT load_extension('x')",
+    ]) {
+      expect((await sql(query(), statement)).status).toBe(400);
+    }
+  });
+
+  it("非白名单表拒绝，但 WITH 定义的 CTE 名照常放行", async () => {
+    expect((await sql(query(), "SELECT * FROM secrets")).status).toBe(400);
+    expect((await sql(query(), "WITH c AS (SELECT 1 AS n) SELECT * FROM c")).status).toBe(200);
   });
 
   it("超过 maxRows 时截断并标记", async () => {

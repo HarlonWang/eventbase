@@ -38,6 +38,20 @@ describe("服务端事件", () => {
     }
   });
 
+  it("配了 onError 才回调，且整个进程只回调一次", async () => {
+    const seen: unknown[] = [];
+    const track = createTracker(env.DB, { onError: (e) => seen.push(e) });
+    await env.DB.prepare("DROP TABLE events").run();
+    try {
+      track({ request }, { name: "quota_blocked" });
+      track({ request }, { name: "quota_blocked" });
+      await flushEvents();
+    } finally {
+      await initDb();
+    }
+    expect(seen).toHaveLength(1);
+  });
+
   it("waitUntil 存在时把写入挂上去", async () => {
     const promises: Promise<unknown>[] = [];
     createTracker(env.DB)(
