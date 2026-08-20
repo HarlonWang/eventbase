@@ -59,7 +59,7 @@ scope 用 `@whlong`（npm 用户名，不是 GitHub handle）——scope 必须�
    - ✅ **已部署**：D1 `trending-events`（APAC，0001~0004 已应用）；`api.trendingai.cn/t/e` 摄取、`/t/q` 取数；生产七项复验全过（丢弃读数、元信息放开、只读底线、递归 CTE 熔断、字符串不误杀）
 2. ✅ KMP 客户端库（`eventbase-kt`）：install_id、批量、落盘队列、重试、生命周期事件、诊断日志、幂等 id、install_id 种子——45 个测试，Android + iOS 两端编译通过
 3. 🟡 **TrendingAI 接入**：composite build 已接、`platformTrackEvent` 与 Aptabase 已删、89 个调用点按 §12.9 重构完毕（词汇随之补出第 20 个事件 `notification_delivery`，见 §12.9 末尾的四处修正）；`installId` 种子参数为此加进 `EventbaseConfig`（客户端与服务端补发事件必须同一个 install_id）。
-   - ⬜ 待办：**eventbase-kt 发 0.1.0 到 Maven Central**（TrendingAI 的 CI 只认 Maven 坐标，不发就打不了 tag）
+   - ✅ eventbase-kt 0.1.0 已发 Maven Central（2026-08-20），TrendingAI 已用纯 Maven 坐标验证构建通过
    - ⬜ 待办：真机演练（断网 5 下 / 杀进程 / 旋转屏幕，用 `adb logcat -s eventbase:D` 与取数接口三处对账）
    - ⬜ 待办：隐私政策与 Play 数据安全表单改采集方（第三方 Aptabase → 自有服务，见 13.1）
 4. ⬜ 取数 SQL 集与对账（`chat_logs` 残差、Aptabase 并行期量级、事件覆盖差集）
