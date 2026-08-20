@@ -272,13 +272,13 @@ CREATE TABLE dim_identity_daily (
 |---|---|
 | 少事件、富属性 | 维度进 props，不进事件名 |
 | 统一命名 | `object_action`，动词一律**过去式**；props 一律 snake_case，布尔用 `is_`/`has_` 前缀，时长用 `_ms`/`_s` 后缀 |
-| 页面浏览统一 | 一个 `screen_viewed` + `screen` 属性，新增页面零埋点改动 |
+| 页面浏览统一 | 一个 `screen_viewed` + `screen` 属性；**由导航层自动产生**（见下方 2026-08-20 修正第 1 条），新增页面零埋点改动 |
 | 漏斗成对 | 关键流程一律 `*_started` / `*_finished`（后者带 `outcome`），不为每种结局单开事件 |
 | **强类型调用面** | 客户端用 sealed class 定义事件与属性，取代裸字符串；编译期防拼写与漏属性 |
 | 单一 taxonomy 来源 | 同一份定义供客户端与服务端白名单，两侧不漂移 |
 | 变更纪律 | **语义变了就用新事件名，绝不复用旧名**——根治「同名不同义」 |
 
-#### 新词汇：20 个事件（由约 70 个收拢而来）
+#### 新词汇：22 个事件（由约 70 个收拢而来）
 
 | 事件 | 关键 props | 吃掉的旧事件 |
 |---|---|---|
@@ -286,7 +286,7 @@ CREATE TABLE dim_identity_daily (
 | `app_backgrounded` | `duration_s`, `is_wake`（后台唤醒标记，见 12.5） | `app_session` |
 | `notification_opened` | `kind` | `daily_picks_notification_open` |
 | `notification_delivery` | `step`（shown / skipped / relinked）, `kind`, `reason`, `attempt`, `delay_min` | `daily_picks_notification_shown` / `_skipped` / `daily_picks_alarm_relinked` |
-| `screen_viewed` | `screen`, `from` | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
+| `screen_viewed` | `screen`, `from`（上一个 `screen` 的值，同值域） | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
 | `tab_switched` | `tab`, `method`（tap / double_tap_refresh） | `tab_switch` / `tab_double_tap_refresh` |
 | `content_opened` | `source`, `section`, `rank`, `content_id`, `title` | `item_click` |
 | `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments）, `source`, `content_id` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
@@ -301,11 +301,13 @@ CREATE TABLE dim_identity_daily (
 | `subscription_action` | `action`（manage / cancel）, `outcome` | `manage_subscription_click` |
 | `newsletter_action` | `action`（banner_clicked / banner_dismissed / submit / cancel）, `result`, `lang`, `status` | `picks_newsletter_banner` / `_dismiss` / `subscribe_submit` / `subscribe_cancel` |
 | `setting_changed` | `key`, `value` | `settings_language_change` / `settings_summary_language_change` / `settings_theme_change` / `settings_seed_color` / `settings_app_icon` / `settings_immersive_toggle` / `settings_open_links_in_browser` / `settings_default_home_tab_change` / `settings_daily_picks_notification` / `settings_custom_theme` 等 10+ |
+| `settings_item_clicked` | `key`（复用 `setting_changed` 的键词汇） | `settings_changelog` / `settings_check_update` / `settings_summary_language`（点开弹窗那次，改值仍走 `setting_changed`） |
 | `api_failed` | `endpoint`, `status` | `billing_prices_failed` / `billing_checkout_failed` / `billing_subscription_failed` / `billing_portal_failed` / `pro_refresh_failed` |
 | `force_update` | `step`（shown / clicked） | `force_update_shown` / `force_update_click` |
 | `feedback_sent` | `kind`, `value` | `settings_summary_language_feedback` / `settings_feedback` |
+| `digest_unavailable` | `source` | `digest_unavailable_shown` |
 
-（`digest_unavailable_shown` 并入 `screen_viewed` 的 `screen=digest_unavailable`。）
+（`digest_unavailable_shown` 原计划并入 `screen_viewed` 的 `screen=digest_unavailable`，**已于 2026-08-20 改为独立事件 `digest_unavailable`**，理由见下方修正第 2 条。）
 
 **接入时（2026-08-19，TrendingAI 客户端）对本表的四处修正**：
 
@@ -313,6 +315,19 @@ CREATE TABLE dim_identity_daily (
 2. `newsletter_action` 的 `banner_shown` 改为 `banner_clicked`：旧事件 `picks_newsletter_banner` 记的其实是**点击**而非曝光，按原值命名会造出一个语义反的口径。
 3. `feedback_sent` 只收**真正提交**的那次（摘要语言支持请求）；旧的 `settings_feedback` / `settings_summary_language_feedback` 是跳转反馈页的点击，归 `screen_viewed(screen=feedback)`。
 4. `chat_image_add` 删除，不进词汇——信号已在 `ai_requested.image_count` 里，代价是丢掉相册/拍照之分。
+
+**首发前的定稿修正（2026-08-20，TrendingAI 客户端首发 eventbase 词汇之前）**：
+
+接入时（08-19）的实现把 `screen_viewed` 写成了 **18 个手写调用点**，且多数记在**导航发起处**（点击回调）而非落地页——记的是点击意图不是页面到达，导航被拦截也会计数。首发前一并纠正如下；此时词汇尚无任何生产数据，故不构成口径断代。
+
+1. **`screen_viewed` 改由导航层自动产生，调用点不再手写。** 两个源：Nav3 的 `backStack` 栈顶变化（覆盖全部二级路由），以及首页四个主 tab 的选中态变化。路由声明实现一个带 `screen` 的 sealed interface，新增路由漏填即编译失败——这是「新增页面零埋点改动」这条原则第一次真正落地。附带两个变化：
+   - `from` 自动取上一个 `screen`，值域与 `screen` 相同。原先手写的 `home_fab` / `readme_detail_summary` 这类**控件级**粒度就此消失（各自所在页面只有一个入口，粒度未实际丢失）；`digest` 的 `from` 曾错记为内容平台（github / hn / ph），属语义纠正。
+   - **返回（pop）算一次浏览**，与 GA / Firebase 的 `screen_view` 一致。
+2. **`screen=digest_unavailable` 作废，改为独立事件 `digest_unavailable`。** 它是 Digest 页的加载失败**状态**而非页面，留在 `screen_viewed` 里会稀释页面浏览量口径，且自动机制不可能产生它。其分母正是自动产生的 `screen_viewed(screen=digest)`。
+3. **`screen=changelog` / `check_update` / `summary_language` 作废，改走新事件 `settings_item_clicked`。** 三者都不是页面：changelog 打开的是外部浏览器，check_update 在 Android 上只触发一次静默检查（全程无界面），summary_language 是弹窗。与 `setting_changed` 共用 key 词汇，「点开 → 改值」的转化可直接算。
+4. **`screen=donate` 作废，不进任何新事件。** 赞助点击本表原就归 `upsell_clicked(target=sponsor)`，由 `ProSponsor.openSponsorPage` 统一上报；接入时那条 `screen_viewed` 是重复计数，删除即可。
+5. **补上 `screen=login`。** L2 核心指标第 7 条（登录漏斗完成率）的口径本就写着 `screen_viewed(screen=login) → auth_started → auth_finished`，接入时漏了这个分母，导致「打开登录界面就走」与「输了邮箱卡在验证码」两种流失无法区分——二者指向的改法完全不同。登录浮层承载完整任务流程，按页面口径记；**其余浮层（筛选、说明、结果提示）不进 `screen_viewed`，也暂不设曝光事件**：其中两个（开通成功、门户失败）与 `checkout_step` / `subscription_action` 完全重复，另两个是纯说明弹窗，孤立的曝光数没有配对漏斗时不产生任何决策。
+6. **首页四个主 tab 纳入 `screen_viewed`**（`home` / `picks` / `me`）。此前它们只有 `tab_switched`，且冷启动落地的那个 tab 一条事件都没有，导致最高频的界面不在页面榜里。`tab_switched` 保留——它带 `method`（tap / double_tap_refresh）维度，是 `screen_viewed` 没有的信息。
 
 #### 保留 `title` 属性的理由
 
