@@ -289,8 +289,8 @@ CREATE TABLE dim_identity_daily (
 | `screen_viewed` | `screen`, `from`（上一个 `screen` 的值，同值域） | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
 | `tab_switched` | `tab`, `method`（tap / double_tap_refresh） | `tab_switch` / `tab_double_tap_refresh` |
 | `content_opened` | `source`, `section`, `rank`, `content_id`, `title` | `item_click` |
-| `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments）, `source`, `content_id` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
-| `list_filtered` | `filter`, `value` | `trending_new_only` / `trending_source_switch` / `filter_confirm` / `history_confirm` |
+| `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments / **apply**）, `source`, `content_id` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
+| `list_filtered` | `filter`（new_only / source / period / language / history_date / history_batch / **region_scope** / **remote_kind** / **employment** / **month**）, `value` | `trending_new_only` / `trending_source_switch` / `filter_confirm` / `history_confirm` |
 | `ai_requested` | `kind`（chat / detail_summary / research）, `from`, `image_count`, `has_context` | `chat_send` / `detail_summary_generate` / `research_start` |
 | `ai_completed` | `kind`, `outcome`（ok / error / interrupted / cache_hit）, `duration_ms`, `reason` | `research_done` / `research_fail` / `stream_interrupted` / `detail_summary_cache_hit` |
 | `auth_started` | `action`（sign_in / link）, `method`, `source` | `sign_in_start` / `account_link_start` / 三个 `*_login_click` |
