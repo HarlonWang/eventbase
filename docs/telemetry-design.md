@@ -71,7 +71,7 @@
 
 ### 11.3 切片维度（每条核心指标都可按此拆）
 
-`app_version` / `channel`（play / fdroid / r2 / 其他）/ `platform`（android / ios）/ `sys_locale` / `country`（边缘 `request.cf`）/ 登录态（匿名 / 已登录 / Pro）
+`app_version` / `channel`（**github** / play / fdroid / r2；消费方按自己的 flavor 定义，TrendingAI 是这四个，`github` 指 GitHub Release 直装）/ `platform`（android / ios）/ `sys_locale` / `country`（边缘 `request.cf`）/ 登录态（匿名 / 已登录 / Pro）
 
 L1 第 3 类问题（版本与渠道）由此满足——它是**切片轴**，不是独立指标。
 
@@ -118,7 +118,7 @@ CREATE TABLE events (
   flow_id      TEXT,                      -- 跨端漏斗串联，语义复用 loginbase
   app_version  TEXT,
   platform     TEXT,                      -- android | ios | server
-  channel      TEXT,                      -- play | fdroid | r2 | ...
+  channel      TEXT,                      -- github | play | fdroid | r2 | ...（值域由消费方定）
   sys_locale   TEXT,
   country      TEXT, asn INTEGER, colo TEXT, timezone TEXT,   -- 全部取自 request.cf
   is_debug     INTEGER NOT NULL DEFAULT 0,
@@ -223,6 +223,20 @@ CREATE TABLE dim_identity_daily (
 
 客户端算 duration（只有它知道前后台切换），服务端只做合法性校验（sessionId ≤ 36 字符、时间窗合理）。沿用现有 `app_session` 语义，但**必须带上"是否后台唤醒产生"的标记**，直接落 `ingest_flags`——1.2.0 那次污染就是因为这个区分只能事后猜。
 
+#### 三个口径不是一回事（2026-08-22 补，读数前必须分清）
+
+`eventbase-kt` 的 `LifecycleTracker` 里 `opened` 标记**进程内一次性、永不复位**，于是：
+
+| 数什么 | 用什么 | 语义 |
+|---|---|---|
+| 进程启动次数 | `app_opened` 计数 | ≈ 冷启动。每个进程生命周期**只报一次** |
+| 前台停留区间数 | `app_backgrounded` 计数 | 每次进后台报一次，一个进程内可以有很多次 |
+| 会话数 | `session_id` 去重 | 与进程一一对应 |
+
+实测（1.4.0 首日）三者是 14 / 38 / 14，**相差 2.7 倍**。核心指标 4「人均日会话数 / 会话时长中位数」用的是 `app_backgrounded.duration_s`，即**前台停留区间**口径——从后台回到前台不会产生新的 `app_opened`，别拿它当"打开次数"。
+
+**`app_opened` 没有 `is_cold` 属性**（词汇表 v1 草案里写过，从未实现：库里 `AppOpened` 是个空 props 的 object，生产数据里 13/13 条 props 为 null）。**决定不补**：`is_cold=false` 的热启动等价于"又一次前台区间"，那正是 `app_backgrounded` 已经在数的东西，加它只是把同一个信息记两遍。删属性、把上面三行口径写清楚，比让库多认一个状态更划算。
+
 ### 12.6 起步要补发的 server 事件（补法 1）
 
 | 事件 | 触发点 | 服务的指标 |
@@ -282,14 +296,14 @@ CREATE TABLE dim_identity_daily (
 
 | 事件 | 关键 props | 吃掉的旧事件 |
 |---|---|---|
-| `app_opened` | `is_cold` | `app_started` |
+| `app_opened` | —（**无 props**，见下方「三个口径」） | `app_started` |
 | `app_backgrounded` | `duration_s`, `is_wake`（后台唤醒标记，见 12.5） | `app_session` |
 | `notification_opened` | `kind` | `daily_picks_notification_open` |
 | `notification_delivery` | `step`（shown / skipped / relinked）, `kind`, `reason`, `attempt`, `delay_min` | `daily_picks_notification_shown` / `_skipped` / `daily_picks_alarm_relinked` |
 | `screen_viewed` | `screen`, `from`（上一个 `screen` 的值，同值域） | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
 | `tab_switched` | `tab`, `method`（tap / double_tap_refresh） | `tab_switch` / `tab_double_tap_refresh` |
-| `content_opened` | `source`, `section`, `rank`, `content_id`, `title` | `item_click` |
-| `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments / **apply**）, `source`, `content_id` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
+| `content_opened` | `source`, `section`（首页区块：debut / deep_dive；**普通列表不带此键**）, `rank`, `content_id`, `title` | `item_click` |
+| `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments / **apply**）, `source`, `content_id`, `from`（动作从哪儿发起：list / debut / detail）, `has_summary` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
 | `list_filtered` | `filter`（new_only / source / period / language / history_date / history_batch / **region_scope** / **remote_kind** / **employment** / **month**）, `value` | `trending_new_only` / `trending_source_switch` / `filter_confirm` / `history_confirm` |
 | `ai_requested` | `kind`（chat / detail_summary / research）, `from`, `image_count`, `has_context` | `chat_send` / `detail_summary_generate` / `research_start` |
 | `ai_completed` | `kind`, `outcome`（ok / error / interrupted / cache_hit）, `duration_ms`, `reason` | `research_done` / `research_fail` / `stream_interrupted` / `detail_summary_cache_hit` |
@@ -382,7 +396,7 @@ CREATE TABLE dim_identity_daily (
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
 | 与身份的关联 | 登录后经 `install_identity` 与账号关联 → Play 数据安全表单必须如实声明「与身份关联」，不能按纯匿名申报 |
-| props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。`item_click` 的 title 是公开条目标题且已截断 100 字符，可留 |
+| props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。`content_opened` 的 title 是公开条目标题且已截断 **60** 字符，可留 |
 | 用户开关 | **先不给**（定 2026-08-18）。维持现状（Aptabase 时代也没有），不因换实现而扩大范围。**已知敞口**：F-Droid 的 Tracking anti-feature 现在就已适用；「永久保留 + 无 opt-out」的组合若被用户提出来，加开关是低成本补救（一个设置项 + 清空队列），**随时可加，不是不可逆决定** |
 | 对外文档 | 隐私政策与 Play 数据安全表单要同步改采集方（第三方 Aptabase → 自有服务） |
 
