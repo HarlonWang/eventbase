@@ -323,6 +323,13 @@ CREATE TABLE dim_identity_daily (
 
 （`digest_unavailable_shown` 原计划并入 `screen_viewed` 的 `screen=digest_unavailable`，**已于 2026-08-20 改为独立事件 `digest_unavailable`**，理由见下方修正第 2 条。）
 
+**`auth_finished` 的 `reason` 值域**（2026-08-25 补记）：取 loginbase 的 wire 错误串本身，不另造词汇——
+邮箱轨用 `LoginbaseException.Api.rawError`（`invalid_code` / `code_expired` / `too_many_attempts` /
+`too_many_requests` / `invalid_email` …），传输层失败用 `network`、`malformed_response`、`unknown`；
+GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `no_email` / `github_in_use` …）。
+**不要把面向用户的本地化文案写进 `reason`**——那是多语言高基数脏值，一进库这个维度就废了。
+`access_denied`（用户在授权页点拒绝）记 `outcome=canceled` 而非 `error`：它与关掉浏览器是同一类主动放弃。
+
 **接入时（2026-08-19，TrendingAI 客户端）对本表的四处修正**：
 
 1. 新增 `notification_delivery`——通知**送达侧**的三个事件本表原先没有归宿，而 `shown` 正是「通知打开率」的分母，删掉只剩分子。
