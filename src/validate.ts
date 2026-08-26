@@ -20,6 +20,7 @@ export interface IncomingBatch {
   install: string;
   session: string;
   user?: string;
+  device?: string;
   sys: IncomingSys;
   events: IncomingEvent[];
 }
@@ -63,6 +64,8 @@ export function parseBatch(raw: unknown): IncomingBatch | BatchError {
     install,
     session,
     user: str(raw.user),
+    // 超长截断而非丢批：设备标识对不上账事小，整批事件丢了事大
+    device: str(raw.device)?.slice(0, LIMITS.deviceChars),
     sys: {
       version: str(sysRaw.version),
       platform: str(sysRaw.platform),

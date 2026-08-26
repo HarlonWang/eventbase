@@ -3,10 +3,11 @@ import schema from "../migrations/0001_events.sql?raw";
 import locale from "../migrations/0002_install_locale.sql?raw";
 import drops from "../migrations/0003_ingest_drops.sql?raw";
 import eventId from "../migrations/0004_event_id.sql?raw";
+import deviceId from "../migrations/0005_device_id.sql?raw";
 import { createIngest, createQuery } from "../src/index";
 
 export async function initDb() {
-  for (const stmt of [schema, locale, drops, eventId].join(";").split(";").filter((s) => s.trim())) {
+  for (const stmt of [schema, locale, drops, eventId, deviceId].join(";").split(";").filter((s) => s.trim())) {
     // ALTER TABLE ADD COLUMN 没有 IF NOT EXISTS，重复 initDb 时只能靠吞这一种错
     await env.DB.prepare(stmt)
       .run()
@@ -53,6 +54,7 @@ export interface EventRow {
   day: string;
   source: string;
   install_id: string | null;
+  device_id: string | null;
   user_id: string | null;
   session_id: string | null;
   flow_id: string | null;

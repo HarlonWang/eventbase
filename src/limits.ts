@@ -4,6 +4,7 @@ export const LIMITS = {
   bodyBytes: 64 * 1024,
   eventName: 60,
   eventIdChars: 36,
+  deviceChars: 64,
   propKeys: 20,
   propKeyChars: 40,
   propValueChars: 180,

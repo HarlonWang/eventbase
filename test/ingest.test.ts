@@ -22,6 +22,24 @@ describe("摄取", () => {
     expect(JSON.parse(row.props!)).toEqual({ is_cold: true });
   });
 
+  it("带 device 时落库，不带则为 null", async () => {
+    await post(ingest(), batch({ device: "abc123deviceid" }));
+    expect((await rows())[0].device_id).toBe("abc123deviceid");
+
+    await wipeDb();
+    await post(ingest(), batch());
+    expect((await rows())[0].device_id).toBeNull();
+  });
+
+  it("device 超长只截断，不丢批", async () => {
+    const res = await post(ingest(), batch({ device: "d".repeat(200) }));
+    expect(res.status).toBe(204);
+
+    const [row] = await rows();
+    expect(row.device_id).toBe("d".repeat(64));
+    expect(row.name).toBe("app_opened");
+  });
+
   it("events 里的非对象条目只丢那条，不把整批打成 500", async () => {
     const res = await post(
       ingest(),
