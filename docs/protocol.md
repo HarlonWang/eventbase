@@ -57,6 +57,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
   "install": "uuid-v4",          // 必填，安装级标识，卸载重装才变
   "session": "uuid-v4",          // 必填，客户端生成
   "user": "identity-id",         // 可选，登录后带上
+  "device": "device-id",         // 可选，设备级标识；服务端不采集也不推导，只落客户端带上的值
   "sys": {
     "version": "1.3.0",          // app 版本
     "platform": "android",       // android | ios
@@ -84,6 +85,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 | body 体积 | ≤ 64 KB | 413 |
 | 事件名 | ≤ 60 字符 | 丢该条 |
 | 事件 `id` | ≤ 36 字符 | 截断，不丢 |
+| `device` | ≤ 64 字符 | 截断，不丢 |
 | props 键数 | ≤ 20 | 丢该条 |
 | props 键长 | ≤ 40 字符 | 丢该条 |
 | props 字符串值 | 截断至 180 字符 | 截断，不丢 |

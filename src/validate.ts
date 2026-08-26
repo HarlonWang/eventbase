@@ -20,6 +20,7 @@ export interface IncomingBatch {
   install: string;
   session: string;
   user?: string;
+  device?: string;
   sys: IncomingSys;
   events: IncomingEvent[];
 }
@@ -45,6 +46,13 @@ function str(v: unknown): string | undefined {
   return typeof v === "string" && v ? v : undefined;
 }
 
+/** 按码点截断：`slice` 切的是 UTF-16 code unit，会把非 BMP 字符劈成未配对 surrogate。 */
+function truncate(v: string | undefined, max: number): string | undefined {
+  if (v === undefined) return undefined;
+  const points = [...v];
+  return points.length <= max ? v : points.slice(0, max).join("");
+}
+
 export function parseBatch(raw: unknown): IncomingBatch | BatchError {
   if (!isRecord(raw)) return { status: 400, message: "body must be an object" };
 
@@ -63,6 +71,8 @@ export function parseBatch(raw: unknown): IncomingBatch | BatchError {
     install,
     session,
     user: str(raw.user),
+    // 超长截断而非丢批：设备标识对不上账事小，整批事件丢了事大
+    device: truncate(str(raw.device), LIMITS.deviceChars),
     sys: {
       version: str(sysRaw.version),
       platform: str(sysRaw.platform),

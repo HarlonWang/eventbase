@@ -45,7 +45,7 @@
 
 | 约定 | 内容 |
 |---|---|
-| 去重单位 | **一律 `install_id`**。Aptabase 的 `user_id` 每日轮换哈希、跨天失效，这是自建的直接动因之一 |
+| 去重单位 | **一律 `install_id`**。Aptabase 的 `user_id` 每日轮换哈希、跨天失效，这是自建的直接动因之一。`device_id`（若消费方注入）**不作去重单位**，只用来算「设备数 ÷ 安装数」得重装率，反过来校准新增与留存——它在 Android 上按「签名密钥 × 用户 × 设备」隔离，同机多 profile 会算成两台，当主口径并不更准 |
 | 日界 | **UTC+8**（定）。存储一律 UTC 毫秒，`day` 列由服务端按 UTC+8 算好落库。理由：这些指标的消费者是产品判断，不是与 cron 对账 |
 | 剔除项 | debug 构建、诊断流量、入口标记为污染的流量（后台唤醒空 session、爬虫批次） |
 | 新老划分 | install 首次出现 < 24h 记为新增；安装日 = 该 `install_id` 首次出现的日期 |
@@ -113,6 +113,7 @@ CREATE TABLE events (
   name         TEXT    NOT NULL,
   source       TEXT    NOT NULL,          -- client | server
   install_id   TEXT,                      -- 客户端事件必有
+  device_id    TEXT,                      -- 可选，仅落客户端显式带上的值；服务端不采集也不推导
   user_id      TEXT,                      -- 登录后有；server 事件多数有
   session_id   TEXT,
   flow_id      TEXT,                      -- 跨端漏斗串联，语义复用 loginbase
@@ -402,6 +403,7 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 | 原始 IP | **不存**。只留 `country` / `asn` / `colo` / `timezone`（全取自 `request.cf`）——与 loginbase v1 同一结论 |
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
+| `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如 Bugly 的 uniqueId），由它注入并自行申报 |
 | 与身份的关联 | 登录后经 `install_identity` 与账号关联 → Play 数据安全表单必须如实声明「与身份关联」，不能按纯匿名申报 |
 | props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。`content_opened` 的 title 是公开条目标题且已截断 **60** 字符，可留 |
 | 用户开关 | **先不给**（定 2026-08-18）。维持现状（Aptabase 时代也没有），不因换实现而扩大范围。**已知敞口**：F-Droid 的 Tracking anti-feature 现在就已适用；「永久保留 + 无 opt-out」的组合若被用户提出来，加开关是低成本补救（一个设置项 + 清空队列），**随时可加，不是不可逆决定** |

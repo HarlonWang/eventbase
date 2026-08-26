@@ -22,6 +22,33 @@ describe("摄取", () => {
     expect(JSON.parse(row.props!)).toEqual({ is_cold: true });
   });
 
+  it("带 device 时落库，不带则为 null", async () => {
+    await post(ingest(), batch({ device: "abc123deviceid" }));
+    expect((await rows())[0].device_id).toBe("abc123deviceid");
+
+    await wipeDb();
+    await post(ingest(), batch());
+    expect((await rows())[0].device_id).toBeNull();
+  });
+
+  it("device 超长只截断，不丢批", async () => {
+    const res = await post(ingest(), batch({ device: "d".repeat(200) }));
+    expect(res.status).toBe(204);
+
+    const [row] = await rows();
+    expect(row.device_id).toBe("d".repeat(64));
+    expect(row.name).toBe("app_opened");
+  });
+
+  it("device 截断按码点算，不劈开非 BMP 字符", async () => {
+    await post(ingest(), batch({ device: "a" + "😀".repeat(64) }));
+
+    const device = (await rows())[0].device_id!;
+    expect([...device]).toHaveLength(64);
+    expect(device).toBe("a" + "😀".repeat(63));
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(device)).toBe(false);
+  });
+
   it("events 里的非对象条目只丢那条，不把整批打成 500", async () => {
     const res = await post(
       ingest(),
