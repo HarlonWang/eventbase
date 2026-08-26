@@ -41,12 +41,12 @@ describe("摄取", () => {
   });
 
   it("device 截断按码点算，不劈开非 BMP 字符", async () => {
-    // 65 个 emoji：按 UTF-16 code unit 切会在代理对中间断开，留下未配对 surrogate
-    await post(ingest(), batch({ device: "😀".repeat(65) }));
+    await post(ingest(), batch({ device: "a" + "😀".repeat(64) }));
 
     const device = (await rows())[0].device_id!;
     expect([...device]).toHaveLength(64);
-    expect(device).toBe("😀".repeat(64));
+    expect(device).toBe("a" + "😀".repeat(63));
+    expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(device)).toBe(false);
   });
 
   it("events 里的非对象条目只丢那条，不把整批打成 500", async () => {
