@@ -42,7 +42,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 
 **刻意不做表名白名单**（2026-08-19 拍板）。它防的是「读了不该读的表」，而本库：
 
-- 只有埋点表——业务数据（`identities` / `paddle_subscriptions` / `gh_token_enc`）在**另一个库、另一个 binding**，爆炸半径由拆库限住，与白名单无关；
+- 只有埋点表——业务数据（`users` / `subscriptions` / `oauth_tokens`）在**另一个库、另一个 binding**，爆炸半径由拆库限住，与白名单无关；
 - schema 随 npm 包公开（`migrations/*.sql` 就在包里），拦 `sqlite_master` 是表演；
 - 调用方已持 admin token，本就该能读全部埋点数据。
 

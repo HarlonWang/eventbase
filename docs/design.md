@@ -6,7 +6,7 @@
 >
 > | 章节 | 所在文件 |
 > |---|---|
-> | §1 动机、§3 容量测算、§8 迁移面、§9 阶段与成本 | `docs/migration-from-aptabase.md`（数字在 `trendingai-notes.md`） |
+> | §1 动机、§3 容量测算、§8 迁移面、§9 阶段与成本 | `docs/migration-from-aptabase.md`（具体读数记在私有仓） |
 > | §2 决策、§4 存储与部署拓扑、§5 接入形态、§6 仓库关系 | `docs/design.md` |
 > | §7 摄取端滥用面、§10~§14（L1~L4 与待议） | `docs/telemetry-design.md` |
 > | 两端契约 | `docs/protocol.md` |
@@ -57,8 +57,8 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 
 | 分析 | 同库时 | 拆库后 | 补法 |
 |---|---|---|---|
-| **付费漏斗** `paywall_view → plan_selected → checkout_opened` 到真实成单 | 一条 SQL JOIN `paddle_subscriptions` 出全程转化率 | 漏斗在 `checkout_opened` 断掉 | webhook 成单时**补发 `checkout_completed`（source=server）**。比 JOIN 更准：成单时刻精确到事件 |
-| **Pro/赞助者行为复核**（`/sponsor-review`） | `pro_entitlements` JOIN 事件表 | 跨不过去 | 每日快照 `identity_id, plan, granted_at, expires_at` 进埋点库（现几十行）。**代价是精度**：当天升级的人会被算成免费用户 |
+| **付费漏斗** `paywall_view → plan_selected → checkout_opened` 到真实成单 | 一条 SQL JOIN 业务库的 `subscriptions` 出全程转化率 | 漏斗在 `checkout_opened` 断掉 | webhook 成单时**补发 `checkout_completed`（source=server）**。比 JOIN 更准：成单时刻精确到事件 |
+| **Pro/赞助者行为复核** | 业务库的 `entitlements` JOIN 事件表 | 跨不过去 | 每日快照 `identity_id, plan, granted_at, expires_at` 进埋点库（现几十行）。**代价是精度**：当天升级的人会被算成免费用户 |
 | **匿名配额拦新用户** | `usage_events`（带 `install_id`）× `chat_send`/`sign_in_*` | `usage_events` 是明细流水、量大，快照法不适用 | 拦截时**补发 `quota_blocked`**（带 `install_id` + `reason`） |
 | **chat 埋点健康度对账**（`chat_send` 数 ≈ `chat_logs` 行数，残差即丢失率） | 一条 SQL | 两个数在两个库，只能各查一次再手工相减 | 每日把 `chat_logs` 计数写一行进埋点库的 `daily_rollup`（一天一行，且这张表本就在计划内） |
 
@@ -97,7 +97,7 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 
 **为什么不一开始就拆**：两 Worker 方案的代码成本很小（4 个文件的壳），成本大头是 Cloudflare 控制台里新建 Worker 项目、连 Git、设 root directory 与 watch paths——**不可版本化、写不进接入文档的一条命令**，每接一个 App 都要重做，会被 App 数量乘起来。而给已跑通的业务 Worker 补 watch paths，还要去动生产配置。
 
-**安全那条理由被重新切分**：真正危险的不是摄取端（JSON 解析 + 参数化 INSERT，不读 secret），是**查询端点**；而它的风险已由决策 5 解决——查询端只绑埋点 D1，即使被绕过也读不到 `identities` / `paddle_subscriptions` / `gh_token_enc`。**拆库比拆 Worker 更能限制爆炸半径。**
+**安全那条理由被重新切分**：真正危险的不是摄取端（JSON 解析 + 参数化 INSERT，不读 secret），是**查询端点**；而它的风险已由决策 5 解决——查询端只绑埋点 D1，即使被绕过也读不到 `users` / `subscriptions` / `oauth_tokens`。**拆库比拆 Worker 更能限制爆炸半径。**
 
 ### 4.5 将来拆 Worker 的成本与判据
 
@@ -109,7 +109,7 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 | 独立 `package.json` + lockfile | 5 min |
 | Cloudflare 新建 Worker 项目：连 Git、root directory、watch paths | 20 min |
 | 给业务 Worker 补 watch paths（排除 `telemetry/`）——**唯一动生产配置的一步** | 5 min |
-| 加 route `api.trendingai.cn/t/*` → 新 Worker（路由跑在 Custom Domain 之前） | 5 min |
+| 加 route `api.example.com/t/*` → 新 Worker（路由跑在 Custom Domain 之前） | 5 min |
 | 新 Worker 重新 `secret put`（secrets 不跨 Worker） | 5 min |
 | 观察通过后，删掉业务 Worker 里的旧挂载 | 5 min |
 
@@ -138,9 +138,9 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 ### 5.1 拓扑（TrendingAI 为例）
 
 ```
-客户端 App ──► api.trendingai.cn/t/*    ─┐
+客户端 App ──► api.example.com/t/*      ─┐
                                          ├─► [业务 Worker] ─binding─► D1: trending（业务）
-业务请求  ──► api.trendingai.cn/api/*  ─┘         └────────binding─► D1: trending-events（埋点）
+业务请求  ──► api.example.com/api/*    ─┘         └────────binding─► D1: trending-events（埋点）
 ```
 
 - 客户端不改 host、无新 DNS/证书，CN 链路与现状一致；
@@ -217,7 +217,7 @@ migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移
 | | `loginbase-kt` | Maven `wang.harlon:loginbase-kt` | ❌ |
 | | 埋点服务端仓（新） | npm 包 + **协议文档唯一权威** | ❌ |
 | | 埋点 KMP 仓（新） | Maven 客户端库 | ❌ |
-| **部署方** | `github-ai-trending-api` | 业务 Worker（含 `/t/*` 摄取挂载）+ 两个 D1 | ✅ 唯一部署处 |
+| **部署方** | 业务 Worker 仓（私有） | 业务 Worker（含 `/t/*` 摄取挂载）+ 两个 D1 | ✅ 唯一部署处 |
 | **客户端** | `TrendingAI` | App | ✅ 发版 |
 
 ### 6.2 依赖方向
@@ -226,7 +226,7 @@ migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移
 npm 侧
     埋点包(server) ◄──peerDependency── loginbase
          ▲                                ▲
-         └────dependency──── github-ai-trending-api ──dependency──┘
+         └──────dependency────── 业务 Worker 仓 ──dependency──────┘
 
 Maven 侧
     埋点-kt ◄──?── loginbase-kt        ← 待议：登录相关的客户端事件由谁上报
@@ -240,7 +240,7 @@ Maven 侧
 
 | D1 库 | 表 | migration 由谁分发 | 谁写 |
 |---|---|---|---|
-| `trending`（业务） | `identities` / `sessions` / `paddle_subscriptions` / `pro_entitlements` / `chat_logs` / `usage_events` … | 业务仓自己（`sessions` 定义来自 loginbase） | 业务代码（含 loginbase 的会话读写） |
+| `trending`（业务） | `users` / `sessions` / `subscriptions` / `entitlements` / `usage_events` … | 业务仓自己（`sessions` 定义来自 loginbase） | 业务代码（含 loginbase 的会话读写） |
 | `trending-events` | `events` / `daily_rollup` / 维表快照 | **埋点包** | 摄取端（客户端事件）+ 业务代码（server 事件，**含 loginbase 的登录事件**） |
 
 loginbase 因此是"劈开"的：**会话状态留业务库，事件搬去埋点库**——这就是它要多接受一个 D1 binding、`auth_events` 退役的含义。
