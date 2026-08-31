@@ -242,12 +242,14 @@ CREATE TABLE dim_identity_daily (
 
 | 事件 | 触发点 | 服务的指标 |
 |---|---|---|
-| `checkout_completed` | Paddle webhook 成单 | 核心 8（漏斗末端） |
+| `checkout_completed` | Paddle webhook 成单，带 `install_id`（下单时经 Paddle `custom_data` 带出、webhook 原样带回，服务端没有第二个来源） | 核心 8（漏斗末端） |
 | `subscription_canceled` / 退款 | Paddle webhook | 付费留存（备选） |
 | `quota_blocked` | 配额闸拦截时，带 `install_id` + `reason` | 备选：匿名配额影响 |
 | loginbase 全部 10 类登录事件 | loginbase 内部 | 核心 7 的服务端段 |
 
 判据：**漏斗末端落在业务库的，一律补发事件，不靠 JOIN**。
+
+补发事件**必须带 install_id**：漏斗前段是客户端事件、按 install 去重，末端缺 install_id 时 `COUNT(DISTINCT install_id)` 忽略 NULL，成单恒为 0——与「没人付款」表现完全一致，无任何迹象指向口径。
 
 ### 12.7 loginbase 侧改动
 
