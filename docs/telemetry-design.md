@@ -310,7 +310,7 @@ CREATE TABLE dim_identity_daily (
 | `list_filtered` | `filter`（new_only / source / period / language / history_date / history_batch / **role_category** / **remote_kind** / **month**）, `value` | `trending_new_only` / `trending_source_switch` / `filter_confirm` / `history_confirm` |
 | `ai_requested` | `kind`（chat / detail_summary / research）, `from`, `image_count`, `has_context` | `chat_send` / `detail_summary_generate` / `research_start` |
 | `ai_completed` | `kind`, `outcome`（ok / error / interrupted / cache_hit）, `duration_ms`, `reason` | `research_done` / `research_fail` / `stream_interrupted` / `detail_summary_cache_hit` |
-| `auth_started` | `action`（sign_in / link）, `method`, `source` | `sign_in_start` / `account_link_start` / 三个 `*_login_click` |
+| `auth_started` | `action`（sign_in / link）, `method`（**sheet** = 打开登录面板 / github / email，后两者是在面板里选定方式）, `source` | `sign_in_start` / `account_link_start` / 三个 `*_login_click` |
 | `auth_finished` | `action`, `method`, `source`, `outcome`（success / canceled / error）, `reason` | `sign_in_success` / `sign_in_canceled` / `sign_in_error` / `account_link_success` / `account_link_error` |
 | `signed_out` | — | `sign_out` |
 | `upsell_clicked` | `source`, `target`（pro / sponsor / newsletter） | `pro_upsell_clicked` / `settings_donate` / `settings_donate_github` / `settings_summary_language_sponsor` |
