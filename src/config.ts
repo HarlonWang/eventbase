@@ -17,4 +17,6 @@ export interface IngestConfig<TEnv> {
   /** 未配置则只校验事件名形状；白名单是可选加固，见 docs/design.md §5.3 */
   allowedEvents?: readonly string[];
   quotas?: Quotas;
+  /** 配置后 `user` 以 HMAC 假名落库（events.user_id 与 install_identity 同时生效），原值不进 D1；返回空串视为配置错误、user 丢弃；`device` 不处理 */
+  identitySecret?: (env: TEnv) => string | undefined;
 }

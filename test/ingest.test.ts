@@ -1,5 +1,6 @@
 import { env } from "cloudflare:workers";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { hashUserId } from "../src/index";
 import { batch, ingest, initDb, post, rows, wipeDb } from "./helpers";
 
 beforeAll(initDb);
@@ -394,5 +395,51 @@ describe("丢弃计数", () => {
     await post(ingest(), batch({ events: [{ name: "Bad" }] }));
 
     expect((await drops()).invalid).toBe(2);
+  });
+});
+
+describe("user 假名化", () => {
+  const secret = "test-identity-secret";
+
+  it("配置 identitySecret 后 user 以 HMAC 假名落库，device 不受影响", async () => {
+    await post(ingest({ identitySecret: () => secret }), batch({ user: "identity-1", device: "device-1" }));
+
+    const expected = await hashUserId(secret, "identity-1");
+    expect(expected).toMatch(/^[0-9a-f]{16}$/);
+    const [row] = await rows();
+    expect(row.user_id).toBe(expected);
+    expect(row.device_id).toBe("device-1");
+
+    const identity = await env.DB.prepare("SELECT user_id FROM install_identity").first<{ user_id: string }>();
+    expect(identity?.user_id).toBe(expected);
+  });
+
+  it("同 secret 同 user 恒同假名，install_identity 不因假名化而重复", async () => {
+    const app = ingest({ identitySecret: () => secret });
+    await post(app, batch({ user: "identity-1" }));
+    await post(app, batch({ user: "identity-1" }));
+
+    const [a, b] = await rows();
+    expect(a.user_id).toBe(b.user_id);
+    const identity = await env.DB.prepare("SELECT * FROM install_identity").all();
+    expect(identity.results).toHaveLength(1);
+  });
+
+  it("换 secret 假名随之改变", async () => {
+    expect(await hashUserId("secret-a", "identity-1")).not.toBe(await hashUserId("secret-b", "identity-1"));
+  });
+
+  it("identitySecret 返回空串时丢弃 user 而不是明文落库", async () => {
+    await post(ingest({ identitySecret: () => "" }), batch({ user: "identity-1" }));
+    const [row] = await rows();
+    expect(row.user_id).toBeNull();
+    const identity = await env.DB.prepare("SELECT * FROM install_identity").all();
+    expect(identity.results).toHaveLength(0);
+  });
+
+  it("未配置 identitySecret 时 user 原样落库", async () => {
+    await post(ingest(), batch({ user: "identity-1" }));
+    const [row] = await rows();
+    expect(row.user_id).toBe("identity-1");
   });
 });

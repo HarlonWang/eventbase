@@ -55,6 +55,7 @@ const ingest = createIngest<Env>({
   db: (env) => env.EVENTS_DB,
   basePath: "/t",                                  // 摄取端点落在 /t/e
   appKeys: (env) => [env.EVENTBASE_KEY],           // 公开 key：用于路由与关停，不是鉴权
+  identitySecret: (env) => env.EVENTBASE_IDENTITY_SECRET, // user 以 HMAC 假名落库，原始身份 id 不进 D1
 });
 
 const query = createQuery<Env>({
