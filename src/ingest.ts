@@ -39,7 +39,10 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
     if ("status" in batch) return c.json({ error: batch.message }, batch.status);
 
     const secret = config.identitySecret?.(env);
-    if (secret && batch.user) batch.user = await hashUserId(secret, batch.user);
+    if (secret !== undefined && batch.user) {
+      // 空 secret 是配置错误：宁可丢身份也不能回退成明文落库
+      batch.user = secret ? await hashUserId(secret, batch.user) : undefined;
+    }
 
     const limiter = config.limiter?.(env);
     if (limiter && !(await limiter.limit({ key: batch.install })).success) {

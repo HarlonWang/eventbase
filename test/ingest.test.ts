@@ -429,6 +429,14 @@ describe("user 假名化", () => {
     expect(await hashUserId("secret-a", "identity-1")).not.toBe(await hashUserId("secret-b", "identity-1"));
   });
 
+  it("identitySecret 返回空串时丢弃 user 而不是明文落库", async () => {
+    await post(ingest({ identitySecret: () => "" }), batch({ user: "identity-1" }));
+    const [row] = await rows();
+    expect(row.user_id).toBeNull();
+    const identity = await env.DB.prepare("SELECT * FROM install_identity").all();
+    expect(identity.results).toHaveLength(0);
+  });
+
   it("未配置 identitySecret 时 user 原样落库", async () => {
     await post(ingest(), batch({ user: "identity-1" }));
     const [row] = await rows();
