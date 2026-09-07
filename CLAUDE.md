@@ -1,15 +1,15 @@
 # eventbase
 
-多 App 共用的埋点底座（客户端上报 + 服务端事件 + D1 明细 + 取数接口）。**开工前先读 README.md 和 `docs/design.md`**——路线、拓扑、接入形态全在里面；指标与数据模型见 `docs/telemetry-design.md`（L1~L4 分层定稿，含事件词汇）；两端契约见 `docs/protocol.md`（唯一权威）；替换 Aptabase 的背景与迁移面见 `docs/migration-from-aptabase.md`。
+多 App 共用的埋点底座（客户端上报 + 服务端事件 + D1 明细 + 取数接口）。**开工前先读 README.md 和 `docs/design.md`**——路线、拓扑、接入形态全在里面；指标与数据模型见 `docs/telemetry-design.md`（L1~L4 分层定稿，含事件命名规范）；两端契约见 `docs/protocol.md`（唯一权威）；替换 Aptabase 的背景与迁移面见 `docs/migration-from-aptabase.md`。
 
-**本仓是 public。**业务读数与内部口径（事件量、增长曲线、订阅与账单、生产域名、业务库表名）一律不进本仓，记在私有父仓；本仓文档只留脱敏后的结论与占位示例。
+**本仓是 public。**只放通用能力与脱敏后的结论；任何消费方 App 的读数、词汇、业务表名、生产域名一律记在其私有仓。
 
 ## 关联仓库（本仓库外的消费方与邻居）
 
 | 仓库 | 角色 |
 |---|---|
 | 业务 Worker 仓（私有） | **首个消费方**：裸 JS Worker，`/t/*` 挂载摄取端；埋点落独立 D1，业务库不动 |
-| [TrendingAI](https://github.com/HarlonWang/TrendingAI) | 客户端消费方：约 130 个调用点要按新词汇重构，替换 Aptabase |
+| [TrendingAI](https://github.com/HarlonWang/TrendingAI) | 客户端消费方，替换 Aptabase；其事件词汇表住私有父仓，本仓不持有 |
 | [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) | **姊妹仓**：KMP 客户端库，独立版本线与 CI；协议以本仓 `docs/protocol.md` 为唯一权威，客户端仓不留副本 |
 | [loginbase](https://github.com/HarlonWang/loginbase) | 邻居 + 将来的消费方：把本库列为 peerDependency，登录事件写进埋点库，其 `auth_events` 退役 |
 | 私有父仓 | 决策记录的出处，业务读数最终归属地 |
@@ -35,4 +35,3 @@
 - **协议变更**：实现 + `docs/protocol.md` 必须同一个 commit，同时在 `eventbase-kt` 仓开跟进 issue，客户端版本落地前不关。两仓各自独立版本线，tag 为裸版本号。
 - **埋点绝不能成为业务的故障源**：服务端写入 `waitUntil` + 吞一切异常；摄取端恒返回 204（含拒绝与丢弃），避免客户端把失败当重试信号。
 - **生产库里有一条冒烟数据**（`channel='smoke'`）：取数与分析时一律排除。
-- **词汇是唯一权威**：新增或修改事件先改 `docs/telemetry-design.md` 的词汇表，禁止在调用点就地发明事件名。语义变了就用新事件名，绝不复用旧名。

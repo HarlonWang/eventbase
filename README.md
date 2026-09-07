@@ -114,7 +114,7 @@ No session replay, no A/B testing, and no user profile store — eventbase recor
 | | |
 |---|---|
 | [Ingestion protocol](docs/protocol.md) | The wire contract — single source of truth for both halves |
-| [Telemetry design](docs/telemetry-design.md) | Event vocabulary, metric definitions, the four-layer model |
+| [Telemetry design](docs/telemetry-design.md) | Naming conventions, metric definitions, the four-layer model |
 | [Design decisions](docs/design.md) | Deployment topology, integration shapes, why the repos are split |
 
 ## License

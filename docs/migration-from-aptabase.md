@@ -29,7 +29,7 @@
 | 客户端上报已收口成一个 expect 函数（`platformTrackEvent`） | 130 个调用点、约 60 个事件名一个都不用改，只换 actual 实现 |
 | iOS 侧 `platformTrackEvent` 现为空实现 | 自建顺带补上 iOS 埋点（Aptabase 也没接） |
 | Aptabase SDK 白送的：批量、离线队列、重试、session 归组、自动采集（OS/版本/locale/国家） | **真正的工作量在客户端库**，不在服务端的 INSERT |
-| 后端 D1 的 `usage_events` 是计费账本 | 与埋点无关，别混口径 |
+| 业务库已有一张计费流水表 | 与埋点无关，别混口径 |
 | Play 数据安全表单声明的采集方是第三方 | 换自建后要同步改 |
 
 ## 9. 阶段与成本

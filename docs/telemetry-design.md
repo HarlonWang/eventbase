@@ -2,7 +2,7 @@
 
 分层讨论记录：L1 目的与边界 → L2 指标清单 → L3 数据模型（含事件词汇）→ L4 非功能。**上层不定稿不进下层**，连带问题记进文末待议清单并标层级。
 
-本文的 L2 指标与 L3 事件词汇取自首个消费方 App 的实际需求，作为**示例**保留；接入自己的 App 时按同一套分层重做一遍，不要照抄词汇表。
+本文只定**通用层**：口径约定、数据模型、命名规范、非功能约束。各 App 自己的核心指标清单与事件词汇表归其私有文档持有——本库不认识任何具体事件名（见 `design.md` 6.4 变更传导表），接入时按同一套分层各自定稿。
 
 > **编号说明**：本文的章节编号沿用调研原稿（2026-08-18 拆分入库），跨文件引用共用同一套编号：
 >
@@ -22,7 +22,7 @@
 **要回答的问题**：
 
 1. **规模与留存**——多少人在用、新老构成、次日/7 日回访（口径一律 `install_id`，不用会轮换的 user_id）；
-2. **功能使用与漏斗**——哪些功能被用、哪一步在掉人（登录、Pro 赞助、订阅、chat）；
+2. **功能使用与漏斗**——哪些功能被用、哪一步在掉人（登录、付费、核心功能）；
 3. **版本与渠道切片**——每个指标都可按 app 版本 / 渠道 / 平台 / 语言 / 国家拆。
 
 **载体**：各 App 自己的 Cloudflare D1；取数走带 token 的 HTTP 接口。**v1 不做看板 UI**。
@@ -34,7 +34,7 @@
 | 看板 / 图表 UI | v1 的消费者是 SQL 与 Claude，不是眼睛 |
 | 会话录制、热图、精确到用户的行为回放 | 隐私成本与实现成本都不匹配收益 |
 | 实时告警 | L5 之后 |
-| 服务端业务账本（`usage_events` / `chat_logs`） | 已有且口径不同，不并入 |
+| 服务端业务账本（计费流水、AI 请求日志） | 已有且口径不同，不并入 |
 | 跨 App 统一视图 | 决策 2 已定：各落各的 D1 |
 
 ## 11. L2 指标清单（定稿 2026-08-18）
@@ -52,39 +52,24 @@
 | 默认分母 | 「当日活跃 install」= 当日有任意非污染事件的去重 `install_id` |
 | 事件来源标记 | `[客]` 客户端上报 / `[服]` loginbase 等服务端 / `[业]` 业务侧补发（见 4.3 补法 1） |
 
-### 11.2 核心指标（10 条）
+### 11.2 核心指标
 
-| # | 指标 | 口径 | 来源 | 驱动什么决策 |
-|---|---|---|---|---|
-| 1 | **DAU / WAU / MAU** | 当日/近 7 天/近 30 天有非污染事件的去重 install | [客] | 大盘健康；发版与推广的效果基线 |
-| 2 | **新增 install** | 安装日为当天的 install 数 | [客] | 推广渠道有没有带来人 |
-| 3 | **D1 / D7 留存** | 按安装日队列，install 口径 | [客] | **Aptabase 时代拿不到的那条**；决定"做新功能还是修留存" |
-| 4 | **人均日会话数 / 会话时长中位数** | `app_backgrounded.duration_s`；按 `is_wake` 剔除后台唤醒产生的空 session | [客] | 判断使用深度；1.2.0 那次污染就是在这条上暴露的 |
-| 5 | **核心动作渗透率** | 当日活跃 install 中，做过 `content_opened` / `ai_requested` / `screen_viewed(screen=digest)` / `content_action(action=favorite)` 的各自比例 | [客] | 四条主路径谁在被真正使用，决定投入去向 |
-| 6 | **消费构成：三源 vs Picks** | `content_opened` 按 `source` / `section` 拆的占比 | [客] | Picks 两档改版、首页改版这类决策的效果读数 |
-| 7 | **登录漏斗完成率** | `screen_viewed(screen=login) → auth_started → auth_finished(outcome)`，按 `method` 拆。**服务端段直接复用 loginbase 的口径，不在此重复定义** | [客]+[服] | 登录链路掉人在哪 |
-| 8 | **订阅漏斗转化率** | `screen_viewed(screen=paywall) → checkout_step(plan_selected → opened → completed[业])` | [客]+[业] | 付费转化；**末端必须是补发的 server 事件**，否则漏斗断在 checkout |
-| 9 | **Pro 入口点击密度** | 每千活跃 install 的 `upsell_clicked` 次数，按 `source` / `target` 拆（`shown` 已于 2026-07-26 下线，转化率不可算，故改用密度） | [客] | 赞助/订阅入口哪个位置有效 |
-| 10 | **埋点健康度（丢失率）** | `ai_requested(kind=chat)` 事件数 vs 业务库 `chat_logs` 行数的残差 | [客]+[业] | **元指标**：前 9 条可不可信全看它。两侧刻意对齐的口径已在 analytics-notes 记过 |
+库内置五个固定指标（`active` / `new_installs` / `retention` / `events` / `drops`，见 `protocol.md`），覆盖 L1 第 1 类「规模与留存」；第 2 类「功能使用与漏斗」由各 App 按自己的事件词汇定义，用 `POST /sql` 取数。**App 的核心指标清单与其事件词汇同住一份私有文档**，不放本仓。
 
-> **事件供给已按 12.9 的新词汇改写**（2026-08-18）：指标定义与口径未变，变的只是产出它们的事件名——词汇重设计不影响 L2 定稿。
+两条通用约束：
+
+- 漏斗末端若落在业务库，一律补发 server 事件，不靠跨库 JOIN（见 12.6）；
+- 埋点健康度（丢失率）是**元指标**：客户端事件数 vs 业务侧同一动作的日志行数之差，其余指标可不可信全看它。
 
 ### 11.3 切片维度（每条核心指标都可按此拆）
 
-`app_version` / `channel`（**github** / play / fdroid / r2；消费方按自己的 flavor 定义，TrendingAI 是这四个，`github` 指 GitHub Release 直装）/ `platform`（android / ios）/ `sys_locale` / `country`（边缘 `request.cf`）/ 登录态（匿名 / 已登录 / Pro）
+`app_version` / `channel`（值域由消费方按自己的分发渠道定义，如 play / fdroid / 直装包）/ `platform`（android / ios）/ `sys_locale` / `country`（边缘 `request.cf`）/ 登录态（匿名 / 已登录 / 付费）
 
 L1 第 3 类问题（版本与渠道）由此满足——它是**切片轴**，不是独立指标。
 
-### 11.4 备选指标（不进核心，按需再取）
+### 11.4 备选指标
 
-- 推送打开率（`notification_opened` / 发送数[业]）
-- Newsletter 订阅转化（`newsletter_action` 的 banner_shown → submit）
-- 版本升级速度（新版本发布后 7 天覆盖率）——强更决策要用
-- 摘要语言分布与切换行为
-- 匿名配额拦截的影响（`quota_blocked`[业] → 之后还回不回来）
-- research / detail_summary 的使用量
-- 设置项分布（主题 / 图标 / 免打扰）
-- 污染流量占比本身（爬虫批次、后台唤醒）
+不进核心、按需再取的指标同样归 App 私有文档。通用的两条：版本升级速度（新版本发布后 7 天覆盖率，强更决策要用）、污染流量占比（爬虫批次、后台唤醒）。
 
 ### 11.5 本层已定与遗留
 
@@ -95,8 +80,7 @@ L1 第 3 类问题（版本与渠道）由此满足——它是**切片轴**，�
 
 **遗留（不阻塞 L3）**：
 
-3. iOS 作为切片值首版无历史数据，趋势从接入日起算；
-4. 迁移期断点：双写并跑期两侧要对账，切换点前后不可直接连成一条曲线（教训见 8. 迁移面）。
+3. 迁移期断点：双写并跑期两侧要对账，切换点前后不可直接连成一条曲线（见 `migration-from-aptabase.md` §8）。
 
 ## 12. L3 数据模型（定稿 2026-08-18）
 
@@ -139,7 +123,7 @@ CREATE TABLE events (
 | `(install_id, day)` | 留存 / 去重活跃 |
 | `(flow_id)` | 漏斗串联 |
 
-**`props` 用单列 JSON（定）**，不学 Aptabase 拆 string/number 两个 map——那是 ClickHouse 有类型化 Map 列才有的收益；在 SQLite 上两者都只能存 TEXT，`json_extract` 取出的数字本来就能直接聚合，拆列只多一层协议复杂度。需要加速时对具体路径建**表达式索引**（如 `item_click` 的 `source`），不把属性提成真实列——提列会让 schema 随各 App 的事件词汇漂移，违反「库要通用」。⚠️ 表达式索引在 D1 上未实测，实现时验。
+**`props` 用单列 JSON（定）**，不学 Aptabase 拆 string/number 两个 map——那是 ClickHouse 有类型化 Map 列才有的收益；在 SQLite 上两者都只能存 TEXT，`json_extract` 取出的数字本来就能直接聚合，拆列只多一层协议复杂度。需要加速时对具体路径建**表达式索引**（如某事件的 `source`），不把属性提成真实列——提列会让 schema 随各 App 的事件词汇漂移，违反「库要通用」。⚠️ 表达式索引在 D1 上未实测，实现时验。
 
 4 个索引 = **每事件 5 行写入**；对着 D1 的 5000 万行/月写入额度算，个位数千事件/天的量级仍是零头。但**索引不可滥建**，新增前先确认有核心指标要它。
 
@@ -161,8 +145,7 @@ CREATE TABLE daily_rollup (
 
 -- install 首次出现的物化表：**与保留期无关也必须建**。
 -- 「新增 install」若靠扫全历史求 min(day)，既昂贵又会在明细被裁剪时失真——
--- 与业务库 isNew/debut 曾经全历史扫 snapshots、最后靠 repos.first_seen_at 物化列
--- 根治的是同一个坑。首次出现时的归因维度在此冻结，用户之后换版本/渠道不影响归因。
+-- 首次出现时的归因维度在此冻结，用户之后换版本/渠道不影响归因。
 CREATE TABLE install_first_seen (
   install_id  TEXT PRIMARY KEY,
   first_day   TEXT NOT NULL,   -- 该 install 已接受事件里最小的 day，晚到的更早事件会改小它
@@ -215,14 +198,14 @@ CREATE TABLE dim_identity_daily (
 
 `GET /t/q`，`Authorization: Bearer <EVENTBASE_ADMIN_TOKEN>`。两种形态并存：
 
-1. **固定指标**（核心 10 条各一个 name，带日期范围与切片参数）——稳定、可缓存、给定期复核用；
+1. **固定指标**（带日期范围与切片参数）——稳定、可缓存、给定期复核用；
 2. **受限 SQL**（只允许 `SELECT`、只连埋点库、结果行数封顶）——给临时追问与 Claude 用。
 
 风险已由拆库兜住：这个端点即使被绕过也读不到业务库（见 7.2）。
 
 ### 12.5 session 由客户端定义
 
-客户端算 duration（只有它知道前后台切换），服务端只做合法性校验（sessionId ≤ 36 字符、时间窗合理）。沿用现有 `app_session` 语义，但**必须带上"是否后台唤醒产生"的标记**，直接落 `ingest_flags`——1.2.0 那次污染就是因为这个区分只能事后猜。
+客户端算 duration（只有它知道前后台切换），服务端只做合法性校验（sessionId ≤ 36 字符、时间窗合理）。**必须带上「是否后台唤醒产生」的标记**，直接落 `ingest_flags`——Aptabase 时代曾有一次后台唤醒污染，正是因为这个区分只能事后猜。
 
 #### 三个口径不是一回事（2026-08-22 补，读数前必须分清）
 
@@ -234,22 +217,15 @@ CREATE TABLE dim_identity_daily (
 | 前台停留区间数 | `app_backgrounded` 计数 | 每次进后台报一次，一个进程内可以有很多次 |
 | 会话数 | `session_id` 去重 | 与进程一一对应 |
 
-实测（1.4.0 首日）三者是 14 / 38 / 14，**相差 2.7 倍**。核心指标 4「人均日会话数 / 会话时长中位数」用的是 `app_backgrounded.duration_s`，即**前台停留区间**口径——从后台回到前台不会产生新的 `app_opened`，别拿它当"打开次数"。
+实测三者可相差数倍。「人均日会话数 / 会话时长中位数」用的是 `app_backgrounded.duration_s`，即**前台停留区间**口径——从后台回到前台不会产生新的 `app_opened`，别拿它当"打开次数"。
 
-**`app_opened` 没有 `is_cold` 属性**（词汇表 v1 草案里写过，从未实现：库里 `AppOpened` 是个空 props 的 object，生产数据里 13/13 条 props 为 null）。**决定不补**：`is_cold=false` 的热启动等价于"又一次前台区间"，那正是 `app_backgrounded` 已经在数的东西，加它只是把同一个信息记两遍。删属性、把上面三行口径写清楚，比让库多认一个状态更划算。
+**`app_opened` 没有 `is_cold` 属性**（早期草案里写过，从未实现：库里 `AppOpened` 是个空 props 的 object）。**决定不补**：`is_cold=false` 的热启动等价于"又一次前台区间"，那正是 `app_backgrounded` 已经在数的东西，加它只是把同一个信息记两遍。删属性、把上面三行口径写清楚，比让库多认一个状态更划算。
 
 ### 12.6 起步要补发的 server 事件（补法 1）
 
-| 事件 | 触发点 | 服务的指标 |
-|---|---|---|
-| `checkout_completed` | Paddle webhook 成单，带 `install_id`（下单时经 Paddle `custom_data` 带出、webhook 原样带回，服务端没有第二个来源） | 核心 8（漏斗末端） |
-| `subscription_canceled` / 退款 | Paddle webhook | 付费留存（备选） |
-| `quota_blocked` | 配额闸拦截时，带 `install_id` + `reason` | 备选：匿名配额影响 |
-| loginbase 全部 10 类登录事件 | loginbase 内部 | 核心 7 的服务端段 |
+判据：**漏斗末端落在业务库的，一律补发事件，不靠 JOIN**。典型四类：支付 webhook 的成单与退款、配额闸拦截、以及 loginbase 的全部登录事件（loginbase 内部产生）。具体事件名归 App 词汇表。
 
-判据：**漏斗末端落在业务库的，一律补发事件，不靠 JOIN**。
-
-补发事件**必须带 install_id**：漏斗前段是客户端事件、按 install 去重，末端缺 install_id 时 `COUNT(DISTINCT install_id)` 忽略 NULL，成单恒为 0——与「没人付款」表现完全一致，无任何迹象指向口径。
+补发事件**必须带 install_id**：漏斗前段是客户端事件、按 install 去重，末端缺 install_id 时 `COUNT(DISTINCT install_id)` 忽略 NULL，成单恒为 0——与「没人付款」表现完全一致，无任何迹象指向口径。成单场景下 install_id 要在下单时经支付商的自定义字段带出、webhook 原样带回，服务端没有第二个来源。
 
 ### 12.7 loginbase 侧改动
 
@@ -273,99 +249,35 @@ CREATE TABLE dim_identity_daily (
 
 **连带口径（必须一起接受）**：`day` 列按 **`event_at`** 算而非 `received_at`，否则离线补报会被记到上报当天、活跃日与留存队列全错。由此历史日期的数字**会被晚到事件追加修改**，故约定：**读数以 T+2 为准**，`daily_rollup` 也在 T+2 定稿。今天看昨天的数会偏低一点，这是正确性的代价。
 
-### 12.9 事件词汇 v1（草案）
+### 12.9 事件词汇：命名规范
 
-**前提（2026-08-18 定）**：不做任何 Aptabase 兼容，**词汇推倒重来**，130 个调用点可自由重构；历史数据不进设计约束，将来需要时用一次性脚本洗成新 schema。因此本节不是「迁移映射」，是**重新设计**。
-
-#### 现状的问题
-
-现有约 **70 个事件名**，最典型的病是**把维度编进事件名**：光 `settings_*` 就有 21 个（about / appearance / favorites / changelog / check_update / data_sources / seed_color / theme_change / language_change / immersive_toggle / donate / donate_github …）。后果已经吃过一次：0.22.0 那批 `settings_*` **名字没改、触发位置从设置页搬到账户中心**，语义静默变了，曲线涨跌无法归因。
-
-其余问题：命名时态不一致（`item_click` 无时态 / `pro_upsell_clicked` 有时态 / `settings_about` 连动词都没有）；每个页面一个事件，新增页面就要新增埋点；调用面是裸字符串 + `Map<String, Any>`，改名漏属性没有任何编译期保护。
+**词汇表由 App 持有**。本库与客户端库都不认识具体事件名：服务端只校验格式、长度与数量上限（白名单可选，见 `design.md` 5.3），客户端库的 `Event` 只是 name + props 的接口。库自身只产生两个事件：`app_opened`（进程内一次）与 `app_backgrounded`（带 `duration_s`、`is_wake`），口径见 12.5。
 
 #### 设计原则
 
 | 原则 | 做法 |
 |---|---|
-| 少事件、富属性 | 维度进 props，不进事件名 |
+| 少事件、富属性 | 维度进 props，不进事件名。反例是每个设置项、每个页面各起一个事件名：曲线一多就无法归因，触发位置一搬语义就静默变了 |
 | 统一命名 | `object_action`，动词一律**过去式**；props 一律 snake_case，布尔用 `is_`/`has_` 前缀，时长用 `_ms`/`_s` 后缀 |
-| 页面浏览统一 | 一个 `screen_viewed` + `screen` 属性；**由导航层自动产生**（见下方 2026-08-20 修正第 1 条），新增页面零埋点改动 |
+| 页面浏览统一 | 一个 `screen_viewed` + `screen` 属性；**由导航层自动产生**（路由声明带 `screen`，漏填即编译失败），新增页面零埋点改动；返回（pop）算一次浏览，与 GA / Firebase 一致 |
 | 漏斗成对 | 关键流程一律 `*_started` / `*_finished`（后者带 `outcome`），不为每种结局单开事件 |
-| **强类型调用面** | 客户端用 sealed class 定义事件与属性，取代裸字符串；编译期防拼写与漏属性 |
+| **强类型调用面** | 客户端用 sealed class 定义事件与属性，取代裸字符串；编译期防拼写与漏属性，改名即全局重构 |
 | 单一 taxonomy 来源 | 同一份定义供客户端与服务端白名单，两侧不漂移 |
-| 变更纪律 | **语义变了就用新事件名，绝不复用旧名**——根治「同名不同义」 |
+| 变更纪律 | **语义变了就用新事件名，绝不复用旧名**——根治「同名不同义」。退役的值在词汇表里划掉并标日期，不删行 |
+| 低基数 `reason` | 错误原因取协议层的机器错误串（如 loginbase 的 wire error），**不要把面向用户的本地化文案写进维度**——多语言高基数脏值一进库这个维度就废了 |
 
-#### 新词汇：22 个事件（由约 70 个收拢而来）
+#### 词汇表的形态
 
-| 事件 | 关键 props | 吃掉的旧事件 |
-|---|---|---|
-| `app_opened` | —（**无 props**，见下方「三个口径」） | `app_started` |
-| `app_backgrounded` | `duration_s`, `is_wake`（后台唤醒标记，见 12.5） | `app_session` |
-| `notification_opened` | `kind` | `daily_picks_notification_open` |
-| `notification_delivery` | `step`（shown / skipped / relinked）, `kind`, `reason`, `attempt`, `delay_min` | `daily_picks_notification_shown` / `_skipped` / `daily_picks_alarm_relinked` |
-| `screen_viewed` | `screen`, `from`（上一个 `screen` 的值，同值域） | `paywall_view` / `readme_view` / `favorite_list_view` / `home_open_settings` / `chat_entry_click` / `digest_open` / `settings_about` / `settings_appearance` / `settings_data_sources` / `settings_favorites` / `settings_changelog` / `settings_subscribe` / `settings_check_update` 等 |
-| `tab_switched` | `tab`, `method`（tap / double_tap_refresh） | `tab_switch` / `tab_double_tap_refresh` |
-| `content_opened` | `source`, `section`（首页区块：debut / deep_dive；**普通列表不带此键**）, `rank`, `content_id`, `title` | `item_click` |
-| `content_action` | `action`（favorite / unfavorite / share_to_ai / star / read_original / hn_comments / **apply**）, `source`, `content_id`, `from`（动作从哪儿发起：list / debut / detail）, `has_summary` | `favorite_toggle` / `share_to_ai` / `repo_star` / `digest_read_original_click` / `digest_hn_comments_click` |
-| `list_filtered` | `filter`（new_only / source / period / language / history_date / history_batch / **role_category** / **remote_kind** / **month**）, `value` | `trending_new_only` / `trending_source_switch` / `filter_confirm` / `history_confirm` |
-| `ai_requested` | `kind`（chat；~~detail_summary~~ 2026-09 退役，「一键解读」功能下线、后续改预生成不经客户端 AI 请求；~~research~~ 2026-09 退役，Deep Research 功能下线——41 天 9 次使用、2/3 来自已删的升级入口，数据见 research_runs 表）, `from`（input / quick_reply / retry / **voice** 2026-09 新增，语音转写后的发送）, `image_count`；~~has_context~~ 2026-09 随入口上下文机制下线退役（chat 唯一入口为通用入口，值恒空） | `chat_send` / `detail_summary_generate` / `research_start` |
-| `ai_completed` | `kind`, `outcome`（ok / error / interrupted；~~cache_hit~~ 随 detail_summary 一同退役——它是解读缓存命中专用值）, `duration_ms`, `reason` | `research_done` / `research_fail` / `stream_interrupted` / `detail_summary_cache_hit` |
-| `voice_input` | `outcome`（sent / cancelled / too_short / empty / error / permission_denied / pro_gate）, `duration_ms`（录音时长） | —（2026-09 新增。语音录入**转写前**的漏斗：一次按住恰好一条；转写成功后的发送另走 `ai_requested from=voice`，两者不重复计） |
-| `auth_started` | `action`（sign_in / link）, `method`（**sheet** = 打开登录面板 / github / email，后两者是在面板里选定方式）, `source` | `sign_in_start` / `account_link_start` / 三个 `*_login_click` |
-| `auth_finished` | `action`, `method`, `source`, `outcome`（success / canceled / error）, `reason` | `sign_in_success` / `sign_in_canceled` / `sign_in_error` / `account_link_success` / `account_link_error` |
-| `signed_out` | — | `sign_out` |
-| `upsell_clicked` | `source`, `target`（pro / sponsor / newsletter） | `pro_upsell_clicked` / `settings_donate` / `settings_donate_github` / `settings_summary_language_sponsor` |
-| `checkout_step` | `step`（plan_selected / opened / reconciled / **completed**[业]）, `plan`, `source` | `plan_selected` / `checkout_opened` / `checkout_reconciled` + 服务端补发的成单 |
-| `subscription_action` | `action`（manage / cancel）, `outcome` | `manage_subscription_click` |
-| `newsletter_action` | `action`（banner_clicked / banner_dismissed / submit / cancel）, `result`, `lang`, `status` | `picks_newsletter_banner` / `_dismiss` / `subscribe_submit` / `subscribe_cancel` |
-| `setting_changed` | `key`, `value` | `settings_language_change` / `settings_summary_language_change` / `settings_theme_change` / `settings_seed_color` / `settings_app_icon` / `settings_immersive_toggle` / `settings_open_links_in_browser` / `settings_default_home_tab_change` / `settings_daily_picks_notification` / `settings_custom_theme` 等 10+ |
-| `settings_item_clicked` | `key`（复用 `setting_changed` 的键词汇） | `settings_changelog` / `settings_check_update` / `settings_summary_language`（点开弹窗那次，改值仍走 `setting_changed`） |
-| `api_failed` | `endpoint`, `status` | `billing_prices_failed` / `billing_checkout_failed` / `billing_subscription_failed` / `billing_portal_failed` / `pro_refresh_failed` |
-| `force_update` | `step`（shown / clicked） | `force_update_shown` / `force_update_click` |
-| `feedback_sent` | `kind`, `value` | `settings_summary_language_feedback` / `settings_feedback` |
-| `digest_unavailable` | `source` | `digest_unavailable_shown` |
+每行一个事件：事件名、关键 props 及其取值、来源（客户端 / server / 库自产）。属性值域写全，含义特殊的值单独注明——例如「打开登录面板」与「选定某种登录方式」若共用 `method` 字段，读数的人必然把前者当成第三种登录方式。
 
-（`digest_unavailable_shown` 原计划并入 `screen_viewed` 的 `screen=digest_unavailable`，**已于 2026-08-20 改为独立事件 `digest_unavailable`**，理由见下方修正第 2 条。）
+#### 内容标识属性
 
-**`auth_finished` 的 `reason` 值域**（2026-08-25 补记）：取 loginbase 的 wire 错误串本身，不另造词汇——
-邮箱轨用 `LoginbaseException.Api.rawError`（`invalid_code` / `code_expired` / `too_many_attempts` /
-`too_many_requests` / `invalid_email` …），传输层失败用 `network`、`malformed_response`、`unknown`；
-GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `no_email` / `github_in_use` …）。
-**不要把面向用户的本地化文案写进 `reason`**——那是多语言高基数脏值，一进库这个维度就废了。
-`access_denied`（用户在授权页点拒绝）记 `outcome=canceled` 而非 `error`：它与关掉浏览器是同一类主动放弃。
-
-**接入时（2026-08-19，TrendingAI 客户端）对本表的四处修正**：
-
-1. 新增 `notification_delivery`——通知**送达侧**的三个事件本表原先没有归宿，而 `shown` 正是「通知打开率」的分母，删掉只剩分子。
-2. `newsletter_action` 的 `banner_shown` 改为 `banner_clicked`：旧事件 `picks_newsletter_banner` 记的其实是**点击**而非曝光，按原值命名会造出一个语义反的口径。
-3. `feedback_sent` 只收**真正提交**的那次（摘要语言支持请求）；旧的 `settings_feedback` / `settings_summary_language_feedback` 是跳转反馈页的点击，归 `screen_viewed(screen=feedback)`。
-4. `chat_image_add` 删除，不进词汇——信号已在 `ai_requested.image_count` 里，代价是丢掉相册/拍照之分。
-
-**首发前的定稿修正（2026-08-20，TrendingAI 客户端首发 eventbase 词汇之前）**：
-
-接入时（08-19）的实现把 `screen_viewed` 写成了 **18 个手写调用点**，且多数记在**导航发起处**（点击回调）而非落地页——记的是点击意图不是页面到达，导航被拦截也会计数。首发前一并纠正如下；此时词汇尚无任何生产数据，故不构成口径断代。
-
-1. **`screen_viewed` 改由导航层自动产生，调用点不再手写。** 两个源：Nav3 的 `backStack` 栈顶变化（覆盖全部二级路由），以及首页四个主 tab 的选中态变化。路由声明实现一个带 `screen` 的 sealed interface，新增路由漏填即编译失败——这是「新增页面零埋点改动」这条原则第一次真正落地。附带两个变化：
-   - `from` 自动取上一个 `screen`，值域与 `screen` 相同。原先手写的 `home_fab` / `readme_detail_summary` 这类**控件级**粒度就此消失（各自所在页面只有一个入口，粒度未实际丢失）；`digest` 的 `from` 曾错记为内容平台（github / hn / ph），属语义纠正。
-   - **返回（pop）算一次浏览**，与 GA / Firebase 的 `screen_view` 一致。
-2. **`screen=digest_unavailable` 作废，改为独立事件 `digest_unavailable`。** 它是 Digest 页的加载失败**状态**而非页面，留在 `screen_viewed` 里会稀释页面浏览量口径，且自动机制不可能产生它。其分母正是自动产生的 `screen_viewed(screen=digest)`。
-3. **`screen=changelog` / `check_update` / `summary_language` 作废，改走新事件 `settings_item_clicked`。** 三者都不是页面：changelog 打开的是外部浏览器，check_update 在 Android 上只触发一次静默检查（全程无界面），summary_language 是弹窗。与 `setting_changed` 共用 key 词汇，「点开 → 改值」的转化可直接算。
-4. **`screen=donate` 作废，不进任何新事件。** 赞助点击本表原就归 `upsell_clicked(target=sponsor)`，由 `ProSponsor.openSponsorPage` 统一上报；接入时那条 `screen_viewed` 是重复计数，删除即可。
-5. **补上 `screen=login`。** L2 核心指标第 7 条（登录漏斗完成率）的口径本就写着 `screen_viewed(screen=login) → auth_started → auth_finished`，接入时漏了这个分母，导致「打开登录界面就走」与「输了邮箱卡在验证码」两种流失无法区分——二者指向的改法完全不同。登录浮层承载完整任务流程，按页面口径记；**其余浮层（筛选、说明、结果提示）不进 `screen_viewed`，也暂不设曝光事件**：其中两个（开通成功、门户失败）与 `checkout_step` / `subscription_action` 完全重复，另两个是纯说明弹窗，孤立的曝光数没有配对漏斗时不产生任何决策。
-6. **首页四个主 tab 纳入 `screen_viewed`**（`home` / `picks` / `me`）。此前它们只有 `tab_switched`，且冷启动落地的那个 tab 一条事件都没有，导致最高频的界面不在页面榜里。`tab_switched` 保留——它带 `method`（tap / double_tap_refresh）维度，是 `screen_viewed` 没有的信息。
-
-#### 保留 `title` 属性的理由
-
-`content_opened` 仍带 `title`（截断 60 字符），尽管最佳实践是只传 `content_id`——**因为拆库后埋点库 JOIN 不到业务库的 `contents` 表**（见 4.3），不带标题的话读数只剩一串 id，人肉分析和 Claude 取数都看不懂。这是拆库的一个具体代价，在此显式接受。
-
-#### 强类型调用面（客户端）
-
-事件与属性用 sealed class 定义，`track(ContentOpened(source = GITHUB, rank = 3, …))` 取代 `trackEvent("item_click", mapOf(…))`。收益是编译期防拼写、防漏属性、改名即全局重构——历史上那几次埋点断点，根因都是裸字符串没有任何保护。
+拆库后埋点库 JOIN 不到业务库的内容表，只带 `content_id` 的读数只剩一串 id。允许带一个截断的公开标题（≤ 60 字符）作为可读性代价，但**禁止任何用户生成内容**（见 13.1）。
 
 ### 12.10 本层待定
 
 1. 事件名白名单开启的时机与维护位置（默认可选，见 5.3）；
-2. `loginbase-kt` 是否依赖埋点 KMP 库——L2 核心第 7 条的客户端段由 App 自己上报即可，**倾向不连这条线**；
+2. `loginbase-kt` 是否依赖埋点 KMP 库——登录漏斗的客户端段由 App 自己上报即可，**倾向不连这条线**；
 3. 保留期与 purge 属 L4（见 13.2），`day` 列与 `daily_rollup` 已为它留好位置。
 
 ## 7. 摄取端滥用面（L4 草案）
@@ -390,10 +302,10 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 ### 7.2 我们的取舍
 
 - **风险的正确切分**：危险的不是摄取端（JSON 解析 + 参数化 INSERT，不读任何 secret），是**查询端点**；而它已由决策 5 兜住——查询端只绑埋点 D1，即使 token 泄露也读不到 `users` / `subscriptions` / `oauth_tokens`。**拆库比拆 Worker 更能限制爆炸半径**（这也是决策 6 敢单 Worker 起步的前提）。
-- **必做**：属性数量与长度上限、批量条数与 body 体积上限（治的其实是**基数爆炸**，业界怕脏基数甚于怕假数据）；双时间戳（`received_at` 服务端权威 + `event_time` 客户端仅供排序与时钟纠偏）；事件名白名单（**默认可选**，见 5.3）；**入口即打标**的 `ingest_flags`，分析层按标记过滤而非入口硬删——反例是诊断流量混进 `usage_events`，至今每次查询都得记着 `install_id NOT LIKE 'diag-%'`。
+- **必做**：属性数量与长度上限、批量条数与 body 体积上限（治的其实是**基数爆炸**，业界怕脏基数甚于怕假数据）；双时间戳（`received_at` 服务端权威 + `event_time` 客户端仅供排序与时钟纠偏）；事件名白名单（**默认可选**，见 5.3）；**入口即打标**的 `ingest_flags`，分析层按标记过滤而非入口硬删——反例是诊断流量混进业务流水表，之后每次查询都得记着排除某个前缀。
 - **限流用 Workers 原生限流绑定**（免费、与 zone 计划无关）：`env.LIMITER.limit({ key })`，period **只能 10 或 60 秒**，**按 colo 局部计数、最终一致**。挡洪水够用，**但不能当日配额**（跨 colo 不汇总）——日配额要自己用 D1/KV 计。
   - 注：$5 是 **Workers Paid**，不是 zone 的 Pro（$25）。WAF 限流规则数仍是 Free zone 的 1 条，但有了 Workers 绑定就不依赖它。
-- **明确不做 Play Integrity / App Attest**：TrendingAI 在 **F-Droid 分发**（自行构建、签名不同），Play Integrity 会把这批真实用户判为不可信；App Attest 同理只覆盖 App Store。为防脏数据而丢真用户，不划算。
+- **明确不做 Play Integrity / App Attest**：消费方若在 **F-Droid 分发**（自行构建、签名不同），Play Integrity 会把这批真实用户判为不可信；App Attest 同理只覆盖 App Store。为防脏数据而丢真用户，不划算。
 - **写入必须批量**：D1 单线程下查询**次数**比数据量更致命，客户端攒批 + 服务端一次 batch insert。
 - **兜底**：开 Cloudflare Budget alert（零成本），加自己的日配额熔断——超了直接丢事件，宁可丢埋点。
 
@@ -406,16 +318,16 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 | 原始 IP | **不存**。只留 `country` / `asn` / `colo` / `timezone`（全取自 `request.cf`）——与 loginbase v1 同一结论 |
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
-| `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如 Bugly 的 uniqueId），由它注入并自行申报 |
+| `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如崩溃上报 SDK 的设备 id），由它注入并自行申报 |
 | 与身份的关联 | 登录后经 `install_identity` 与账号关联 → Play 数据安全表单必须如实声明「与身份关联」，不能按纯匿名申报 |
-| props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。`content_opened` 的 title 是公开条目标题且已截断 **60** 字符，可留 |
+| props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。公开条目标题截断 **60** 字符后可留（见 12.9） |
 | 对外文档 | 隐私政策与 Play 数据安全表单要同步改采集方（第三方 Aptabase → 自有服务） |
 
 ### 13.2 保留期：明细永久保留（定 2026-08-18）
 
 **决策：不设保留期，明细 `events` 永久保留**（在 A=180 天 / B=365 天 / C=永久 三种姿态中选 C）。
 
-理由是成本算完之后这不再是成本题：按当前 7.5 万行/月，永久保留三年也才约 500 万行、1.2 GB，而单库上限 10 GB、读取额度 250 亿行/月。换来的是**分析自由度最大**——不会出现「当初没预先聚合过的口径，事后永久失效」。
+理由是成本算完之后这不再是成本题：按当前量级永久保留数年也只占单库 10 GB 上限的零头（测算记在私有仓）。换来的是**分析自由度最大**——不会出现「当初没预先聚合过的口径，事后永久失效」。
 
 **代价（要诚实记着）**：
 
@@ -430,7 +342,7 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 三层，从外到内：
 
 1. **客户端开关**（用户自己关，见 13.1）；
-2. **服务端全局开关**——放 KV，改完即时生效、无需部署（照现有 `APP_CONFIG` 的做法）；
+2. **服务端全局开关**——放 KV，改完即时生效、无需部署（照消费方现有 KV 配置的做法）；
 3. **日配额熔断**——超了直接丢。
 
 摄取端**恒返回 204**：服务端关闭或丢弃时也不回错误，避免客户端把它当失败去重试，造成风暴。
@@ -454,11 +366,7 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 | Kotlin 包 | `wang.harlon.eventbase` | ✅ |
 | **npm** | **`@whlong/eventbase`**（scoped） | 裸名 `eventbase` 被占 |
 
-**只有 npm 裸名有冲突**：`eventbase` 是 2014 年的老包（JacksonTian，共 2 个版本，最后动过是 2022，近一月 9 次下载），实质废弃但 npm 不会自动回收。选 scoped 而非 `eventbase-cf` 这类后缀，因为 scope 是自有命名空间、永远不会再被抢，且名字本身保持干净。
-
-**裸名已去信询问（2026-08-18 已发）**：收件人 Jackson Tian（朴灵）`shyvo1987@gmail.com`，信里给出了对方唯一要做的动作 `npm owner add whlong eventbase`（我方 npm 用户名 `whlong`，与 loginbase 同账号）。npm 官方的名字争议流程要 4 周且要求原作者失联，是最后手段，未启用。
-
-**不等回复**：直接按 `@whlong/eventbase` 开工，消费方目前只有自己、改名成本几乎为零。**若日后拿到裸名，从 `1.0.0` 起发**（不接着旧包的 0.0.3），并在 README 写明「本包自 1.0.0 起为全新项目」，避免旧包的存量用户误装。
+**只有 npm 裸名有冲突**：`eventbase` 是 2014 年的老包，实质废弃但 npm 不会自动回收。选 scoped 而非 `eventbase-cf` 这类后缀，因为 scope 是自有命名空间、永远不会再被抢，且名字本身保持干净。裸名不再争取。
 
 ### 13.6 安全与运维
 
@@ -476,7 +384,6 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 
 **L2 指标**
 - ~~核心指标清单尚未选~~ → 草案已落第 11 节，待定稿；未决项见 11.5（日界口径、与 loginbase 登录漏斗的口径归属）
-- 现有约 60 个事件名哪些留、哪些趁迁移砍掉（核心 10 条实际只用到其中约 12 个，其余全是备选或纯记录）
 
 **L3 数据模型** → 草案已落第 12 节，未决项见 12.8
 
@@ -487,7 +394,7 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 - ~~session 的定义由谁给~~ → 12.5：客户端算，且必须带后台唤醒标记
 - ~~**`install_id` ↔ `identity_id` 映射**~~ → 12.2 `install_identity` 表；补登不回填。原文：（拆库的先决条件，见 4.3）：靠登录成功事件带 `user_id` 写进埋点库；补登（老用户升级后首次登录前）怎么处理、一机多账号与一账号多机怎么表达
 - ~~**要补发哪些 server 事件**~~ → 12.6 起步四类。原文：（拆库后漏斗闭合的主力，见 4.3 补法 1）：起步清单 `checkout_completed` / `quota_blocked` / 退款 / 绑定；判据是「漏斗末端落在业务库」的都要补
-- ~~**维表快照与 daily_rollup 的形态**~~ → 12.2 两张表已定；仍未定跑批时机。原文：：快照哪些列、几点跑、用 cron 还是随 picks 流程；rollup 先收哪几个对账口径（`chat_logs` 计数是第一个）
+- ~~**维表快照与 daily_rollup 的形态**~~ → 12.2 两张表已定；仍未定跑批时机。原文：快照哪些列、几点跑、用 cron 还是随业务批处理；rollup 先收哪几个对账口径（AI 请求日志计数是第一个）
 - loginbase 需要接受**第二个 D1 binding**（如 `statsDb`）才能把登录事件写进埋点库（决策 5 拆库的必然结果）——属其配置接口变更，须与决策 4 一并落到 protocol/README
 
 **L4 非功能** → 草案已落第 13 节，未决项见 13.7
@@ -501,4 +408,4 @@ GitHub 轨用回跳带回的 `error` 值（`access_denied` / `oauth_failed` / `n
 - 摄取端拆独立 Worker（可逆、1~1.5 小时，触发判据见 4.5）
 - 看板 UI
 - 告警
-- Tono 系 App 接入
+- 其他 App 接入

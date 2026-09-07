@@ -21,7 +21,7 @@
 | 2 | **数据落各 App 自己的 D1** | 与 loginbase「不做中心化账号」一致；跨 App 对比靠手工拼，接受 |
 | 3 | **与 loginbase 的 `auth_events` 合表**：新库统管一张事件表，登录事件也进来 | 否则登录漏斗的服务端段与客户端段永远拼不起来（loginbase 待议清单里「客户端事件与服务端事件同表 ✅」已是同一结论） |
 | 4 | **loginbase 把本库列为 peerDependency**，直接调本库的 writer，消费方零接线 | 同日一并改判 loginbase 的「依赖最小集」铁律为「依赖准入」（业界权威库 + 自己的库可依赖），原先被铁律逼出的配置注入绕法随之取消 |
-| 5 | **埋点独立一个 D1 库**（`trending-events`，binding `EVENTS_DB`），与业务库分开 | D1 每库单线程，埋点洪水与分析慢查询会抢业务的执行队列；付费档拆库零边际成本。**这是唯一不可逆的一项**，故先定。详见第 4 节 |
+| 5 | **埋点独立一个 D1 库**（`<app>-events`，binding `EVENTS_DB`），与业务库分开 | D1 每库单线程，埋点洪水与分析慢查询会抢业务的执行队列；付费档拆库零边际成本。**这是唯一不可逆的一项**，故先定。详见第 4 节 |
 | 6 | **单 Worker 起步**：摄取端挂在现有业务 Worker 上（路径 `/t/*`），不另建 Worker | 性能影响实质为零，而两 Worker 方案的成本大头是**不可版本化的控制台配置**，会被 App 数量乘起来。拆分是**可逆**的将来项，判据见 4.5 |
 
 ### 决策 4 的展开（2026-08-18 改判）
@@ -57,10 +57,10 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 
 | 分析 | 同库时 | 拆库后 | 补法 |
 |---|---|---|---|
-| **付费漏斗** `paywall_view → plan_selected → checkout_opened` 到真实成单 | 一条 SQL JOIN 业务库的 `subscriptions` 出全程转化率 | 漏斗在 `checkout_opened` 断掉 | webhook 成单时**补发 `checkout_completed`（source=server）**。比 JOIN 更准：成单时刻精确到事件 |
-| **Pro/赞助者行为复核** | 业务库的 `entitlements` JOIN 事件表 | 跨不过去 | 每日快照 `identity_id, plan, granted_at, expires_at` 进埋点库（现几十行）。**代价是精度**：当天升级的人会被算成免费用户 |
-| **匿名配额拦新用户** | `usage_events`（带 `install_id`）× `chat_send`/`sign_in_*` | `usage_events` 是明细流水、量大，快照法不适用 | 拦截时**补发 `quota_blocked`**（带 `install_id` + `reason`） |
-| **chat 埋点健康度对账**（`chat_send` 数 ≈ `chat_logs` 行数，残差即丢失率） | 一条 SQL | 两个数在两个库，只能各查一次再手工相减 | 每日把 `chat_logs` 计数写一行进埋点库的 `daily_rollup`（一天一行，且这张表本就在计划内） |
+| **付费漏斗** 从 paywall 曝光、选套餐、打开 checkout 到真实成单 | 一条 SQL JOIN 业务库的 `subscriptions` 出全程转化率 | 漏斗在「打开 checkout」断掉 | webhook 成单时**补发成单事件（source=server）**。比 JOIN 更准：成单时刻精确到事件 |
+| **付费用户行为复核** | 业务库的 `entitlements` JOIN 事件表 | 跨不过去 | 每日快照 `identity_id, plan, granted_at, expires_at` 进埋点库（现几十行）。**代价是精度**：当天升级的人会被算成免费用户 |
+| **匿名配额拦新用户** | 业务库的配额流水（带 `install_id`）× 客户端的请求与登录事件 | 配额流水是明细、量大，快照法不适用 | 拦截时**补发拦截事件**（带 `install_id` + `reason`） |
+| **埋点健康度对账**（客户端请求事件数 ≈ 业务侧 AI 请求日志行数，残差即丢失率） | 一条 SQL | 两个数在两个库，只能各查一次再手工相减 | 每日把业务侧计数写一行进埋点库的 `daily_rollup`（一天一行，且这张表本就在计划内） |
 
 **三种补法，按优先级**：
 
@@ -68,11 +68,11 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 |---|---|---|---|
 | 1 | **业务侧补发 server 事件** | 状态变更类（成单、拦截、退款、绑定） | 多几行写入；且它本身就是更好的设计——漏斗末端不该靠 JOIN 去推，这与决策 3「登录事件合表」同源 |
 | 2 | 维表每日快照 | 小表慢变属性（identity → plan） | 当天内的状态变化丢失 |
-| 3 | 每日聚合值写入 | 对账类（`chat_logs` 计数） | 只有天粒度 |
+| 3 | 每日聚合值写入 | 对账类（业务侧日志计数） | 只有天粒度 |
 
 **一个先决条件**：事件的主键是 `install_id`（匿名），业务表是 `identity_id`。**这个映射必须住在埋点库里**（登录成功的事件带上 `user_id`），否则拆不拆库都对不齐。
 
-**真正无解、只能手工查两次**：需要业务库明细、且事先无法预判要补什么事件的临时追问（如「这批人问了什么（`chat_logs` 全文）对应他们的点击路径」）。一年碰上几次，可接受。
+**真正无解、只能手工查两次**：需要业务库明细、且事先无法预判要补什么事件的临时追问（如「这批人提了什么请求对应他们的点击路径」）。一年碰上几次，可接受。
 
 **结论（已定）**：拆。前三种补法覆盖日常绝大部分分析，唯一真实损失是探索性明细追问，一年碰上几次、手工查两次可接受。
 
@@ -85,7 +85,7 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 | 耦合点 | 实际影响 | 判断 |
 |---|---|---|
 | Bundle 体积 | 埋点包（校验 + 参数化 SQL，无重依赖）约增几十 KB。付费档上限 gzip 后 10 MB，全局作用域须 1 秒内执行完 | 亚毫秒级，**唯一可测量但可忽略** |
-| isolate 内 CPU 争用 | JS 单线程；埋点每请求约 1ms 级，当前量 **0.03 QPS** | 撞上概率极低；洪水时瓶颈是账单不是延迟 |
+| isolate 内 CPU 争用 | JS 单线程；埋点每请求约 1ms 级，当前量级极低 | 撞上概率极低；洪水时瓶颈是账单不是延迟 |
 | `waitUntil` 写库 | 响应已返回，只延长计费生命周期 | 不阻塞业务响应 |
 | 绑两个 D1 | 跨库写走各自队列 | 零影响（正是拆库要的） |
 | **部署频次上升** | 埋点改动触发业务 Worker 重新部署 → 全球 isolate 重建，冷启动抖动、内存缓存清空 | **最真实的一条**，几十毫秒级瞬时 |
@@ -126,25 +126,25 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 
 ## 5. 接入形态与部署
 
-### 5.0 命名：为什么是 `trending-events` 而不是 `trending-telemetry`
+### 5.0 命名：为什么是 `<app>-events` 而不是 `<app>-telemetry`
 
 词汇一致性优先：库叫 `eventbase`、表叫 `events`，库名再引入第三个词会让人每次都要在脑子里做一次映射。
 
 语义上 `telemetry` 也不是最准的那个词：OpenTelemetry 之后，telemetry 在行业里越来越指向 traces / metrics / logs
-这一侧的**系统运行状态**，而本项目的核心 10 条指标全是留存、渗透率、漏斗这类**产品分析**（analytics）。
+这一侧的**系统运行状态**，而本项目要回答的全是留存、渗透率、漏斗这类**产品分析**（analytics）。
 业界确实大量把客户端行为回传也叫 telemetry（VS Code、Firefox、.NET CLI），所以那样叫不算错，只是会带来
 「里面应该有链路和指标」的错误预期。
 
-### 5.1 拓扑（TrendingAI 为例）
+### 5.1 拓扑（单 Worker 起步）
 
 ```
 客户端 App ──► api.example.com/t/*      ─┐
-                                         ├─► [业务 Worker] ─binding─► D1: trending（业务）
-业务请求  ──► api.example.com/api/*    ─┘         └────────binding─► D1: trending-events（埋点）
+                                         ├─► [业务 Worker] ─binding─► D1: <app>（业务）
+业务请求  ──► api.example.com/api/*    ─┘         └────────binding─► D1: <app>-events（埋点）
 ```
 
 - 客户端不改 host、无新 DNS/证书，CN 链路与现状一致；
-- **服务端事件不走 HTTP**：业务 Worker 直接用 binding 写埋点库（`checkout_completed`、`quota_blocked`、loginbase 的登录事件），省一次往返、也不受摄取限流影响。跨库写不会重新引入队列耦合——**隔离在库级，不在 Worker 级**。
+- **服务端事件不走 HTTP**：业务 Worker 直接用 binding 写埋点库（成单、配额拦截、loginbase 的登录事件），省一次往返、也不受摄取限流影响。跨库写不会重新引入队列耦合——**隔离在库级，不在 Worker 级**。
 
 ### 5.2 包对外的两个入口
 
@@ -190,20 +190,20 @@ if (pathname.startsWith('/t'))   return events.fetch(request, env, ctx);
 ```toml
 [[d1_databases]]
 binding = "EVENTS_DB"
-database_name = "trending-events"
+database_name = "<app>-events"
 migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移文件，升级包即带新迁移
 ```
 
 **两处刻意降低接入门槛**（与 loginbase 的既有做法不同，理由是埋点库是全新独立库、迁移完全由包拥有）：
 
 1. **迁移免复制**——loginbase 因与业务表共库、编号要排进同一序列，才让消费方复制文件（`041_auth_events.sql`）；埋点库直接把 `migrations_dir` 指向 `node_modules`，接入方永远不碰迁移文件；
-2. **事件名白名单默认可选**——首次接入不必把约 60 个事件名抄进配置，默认只校验格式/长度/数量上限；白名单作为可选加固，等词汇稳定再开。
+2. **事件名白名单默认可选**——首次接入不必把全部事件名抄进配置，默认只校验格式/长度/数量上限；白名单作为可选加固，等词汇稳定再开。
 
 客户端侧：加一个 KMP 依赖 + 填 endpoint 与 appKey 两个值。**没有新的部署单元、没有控制台操作。**
 
 ### 5.4 部署顺序与故障面
 
-顺序沿用既有铁律「**先迁移、后部署**」：建库 → apply migration → 部署 Worker。反过来会让新代码引用尚不存在的表，就是 039 那次 `/api/me` 全量 500 的形状。
+顺序沿用既有铁律「**先迁移、后部署**」：建库 → apply migration → 部署 Worker。反过来会让新代码引用尚不存在的表，首个消费方曾因此让一个业务接口全量 500。
 
 故障面：摄取路由整体 try/catch，异常只影响 `/t/*`；服务端写事件一律 `waitUntil` + 吞异常（照抄 loginbase stats 第一原则：统计绝不能成为业务的故障源）。
 
@@ -240,8 +240,8 @@ Maven 侧
 
 | D1 库 | 表 | migration 由谁分发 | 谁写 |
 |---|---|---|---|
-| `trending`（业务） | `users` / `sessions` / `subscriptions` / `entitlements` / `usage_events` … | 业务仓自己（`sessions` 定义来自 loginbase） | 业务代码（含 loginbase 的会话读写） |
-| `trending-events` | `events` / `daily_rollup` / 维表快照 | **埋点包** | 摄取端（客户端事件）+ 业务代码（server 事件，**含 loginbase 的登录事件**） |
+| `<app>`（业务） | `users` / `sessions` / `subscriptions` / `entitlements` … | 业务仓自己（`sessions` 定义来自 loginbase） | 业务代码（含 loginbase 的会话读写） |
+| `<app>-events` | `events` / `daily_rollup` / 维表快照 | **埋点包** | 摄取端（客户端事件）+ 业务代码（server 事件，**含 loginbase 的登录事件**） |
 
 loginbase 因此是"劈开"的：**会话状态留业务库，事件搬去埋点库**——这就是它要多接受一个 D1 binding、`auth_events` 退役的含义。
 

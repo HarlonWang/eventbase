@@ -114,7 +114,7 @@ Cloudflare Workers，带 D1 binding · `hono` ^4.12.8 · 一个会说[上报协�
 | | |
 |---|---|
 | [上报协议](docs/protocol.md) | wire 契约——两端的唯一权威 |
-| [埋点设计](docs/telemetry-design.md) | 事件词汇、指标口径、四层模型 |
+| [埋点设计](docs/telemetry-design.md) | 命名规范、指标口径、四层模型 |
 | [设计决策](docs/design.md) | 部署拓扑、接入形态、为什么拆两个仓 |
 
 ## License
