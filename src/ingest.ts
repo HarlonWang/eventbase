@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { IngestConfig } from "./config.js";
 import { geoOf } from "./geo.js";
+import { hashUserId } from "./hash-user-id.js";
 import { LIMITS } from "./limits.js";
 import { dropStatements, eventStatements, firstSeenStatement, identityStatement, quotaStatement, readQuota } from "./store.js";
 import { dayOf } from "./time.js";
@@ -36,6 +37,9 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
 
     const batch = parseBatch(raw);
     if ("status" in batch) return c.json({ error: batch.message }, batch.status);
+
+    const secret = config.identitySecret?.(env);
+    if (secret && batch.user) batch.user = await hashUserId(secret, batch.user);
 
     const limiter = config.limiter?.(env);
     if (limiter && !(await limiter.limit({ key: batch.install })).success) {

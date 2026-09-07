@@ -319,6 +319,7 @@ CREATE TABLE dim_identity_daily (
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
 | `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如崩溃上报 SDK 的设备 id），由它注入并自行申报 |
+| `user_id` | 摄取端可配 `identitySecret`，落库前替换为 HMAC-SHA256 假名（前 64 位）：D1 导出、备份、取数 token 泄露都拿不到原始身份 id，反查需密钥加业务侧 id 表。密钥不轮换，轮换即全部假名作废、用户级留存断开。server 事件（`createTracker`）的 `userId` **不**假名化，两种来源混用时口径对不上 |
 | 与身份的关联 | 登录后经 `install_identity` 与账号关联 → Play 数据安全表单必须如实声明「与身份关联」，不能按纯匿名申报 |
 | props 内容 | **禁止出现用户生成内容**（chat 正文、搜索词、邮箱）。公开条目标题截断 **60** 字符后可留（见 12.9） |
 | 对外文档 | 隐私政策与 Play 数据安全表单要同步改采集方（第三方 Aptabase → 自有服务） |
