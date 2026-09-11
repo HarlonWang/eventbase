@@ -23,6 +23,22 @@ describe("摄取", () => {
     expect(JSON.parse(row.props!)).toEqual({ is_cold: true });
   });
 
+  it("不落 city / region——这两列只给服务端事件", async () => {
+    const req = new Request("http://localhost/e", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(batch()),
+      cf: { country: "CL", city: "Santiago", region: "Santiago Metropolitan" },
+    } as RequestInit);
+    expect((await ingest().request(req, undefined, env)).status).toBe(204);
+
+    const [row] = await rows();
+    // country 落了才说明 cf 确实被读到，此时 city/region 为空才是「刻意不写」
+    expect(row.country).toBe("CL");
+    expect(row.city).toBeNull();
+    expect(row.region).toBeNull();
+  });
+
   it("带 device 时落库，不带则为 null", async () => {
     await post(ingest(), batch({ device: "abc123deviceid" }));
     expect((await rows())[0].device_id).toBe("abc123deviceid");

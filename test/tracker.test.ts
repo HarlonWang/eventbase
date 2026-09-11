@@ -22,6 +22,18 @@ describe("服务端事件", () => {
     expect(JSON.parse(row.props!)).toEqual({ step: "completed" });
   });
 
+  it("落 city / region", async () => {
+    const cf = new Request("https://api.example.com/api/checkout", {
+      cf: { country: "CL", asn: 22047, colo: "EZE", timezone: "America/Santiago", city: "Santiago", region: "Santiago Metropolitan" },
+    } as RequestInit);
+    createTracker(env.DB)({ request: cf }, { name: "oauth_callback" });
+    await flushEvents();
+
+    const [row] = await rows();
+    expect(row.city).toBe("Santiago");
+    expect(row.region).toBe("Santiago Metropolitan");
+  });
+
   it("带 flow_id 时可与客户端事件串成同一条漏斗", async () => {
     createTracker(env.DB)({ request }, { name: "auth_finished", flowId: "flow-1" });
     await flushEvents();

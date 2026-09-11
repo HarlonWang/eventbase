@@ -138,7 +138,7 @@ v1 指标：`active`（当日活跃 install 去重）、`new_installs`（安装�
 
 ## 服务端事件
 
-同一张表，`source='server'`，不经 HTTP：消费方在自己的 Worker 里用 `createTracker({ db })` 直接写 D1。地理六项取自 `request.cf`，因此 writer 必须能拿到请求上下文。
+同一张表，`source='server'`，不经 HTTP：消费方在自己的 Worker 里用 `createTracker(db)` 直接写 D1。地理六项（`country` / `asn` / `colo` / `timezone` / `city` / `region`）取自 `request.cf`，因此 writer 必须能拿到请求上下文。**后两项只有服务端事件落**，客户端摄取路径不写。
 
 判据：**漏斗末端落在业务库的，一律补发 server 事件，不靠跨库 JOIN**。
 

@@ -53,8 +53,8 @@ function write(
       .prepare(
         `INSERT INTO events
            (received_at, event_at, day, name, source, install_id, user_id, flow_id,
-            platform, country, asn, colo, timezone, props)
-         VALUES (?, ?, ?, ?, 'server', ?, ?, ?, 'server', ?, ?, ?, ?, ?)`
+            platform, country, asn, colo, timezone, city, region, props)
+         VALUES (?, ?, ?, ?, 'server', ?, ?, ?, 'server', ?, ?, ?, ?, ?, ?, ?)`
       )
       .bind(
         now,
@@ -68,6 +68,8 @@ function write(
         geo.asn,
         geo.colo,
         geo.timezone,
+        geo.city,
+        geo.region,
         event.props ? JSON.stringify(event.props) : null
       )
       .run()
