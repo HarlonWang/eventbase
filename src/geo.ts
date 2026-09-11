@@ -3,9 +3,18 @@ export interface Geo {
   asn: number | null;
   colo: string | null;
   timezone: string | null;
+  city: string | null;
+  region: string | null;
 }
 
-const ABSENT: Geo = { country: "unknown", asn: null, colo: null, timezone: null };
+const ABSENT: Geo = {
+  country: "unknown",
+  asn: null,
+  colo: null,
+  timezone: null,
+  city: null,
+  region: null,
+};
 
 /** 取自 Cloudflare 边缘的 request.cf，零外部依赖。是 IP 归属地，不是用户声明位置。 */
 export function geoOf(request: Request | undefined): Geo {
@@ -17,5 +26,7 @@ export function geoOf(request: Request | undefined): Geo {
     asn: typeof cf.asn === "number" ? cf.asn : null,
     colo: str(cf.colo),
     timezone: str(cf.timezone),
+    city: str(cf.city),
+    region: str(cf.region),
   };
 }

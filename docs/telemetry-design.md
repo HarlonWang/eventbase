@@ -106,6 +106,7 @@ CREATE TABLE events (
   channel      TEXT,                      -- github | play | fdroid | r2 | ...（值域由消费方定）
   sys_locale   TEXT,
   country      TEXT, asn INTEGER, colo TEXT, timezone TEXT,   -- 全部取自 request.cf
+  city         TEXT, region TEXT,           -- 同上，但只有 source='server' 会填，见 13.1
   is_debug     INTEGER NOT NULL DEFAULT 0,
   ingest_flags TEXT,                      -- 入口打标：bot / bg_wake / diag / …
   props        TEXT                       -- JSON 单列（定），低频字段
@@ -315,7 +316,8 @@ CREATE TABLE dim_identity_daily (
 
 | 项 | 结论 |
 |---|---|
-| 原始 IP | **不存**。只留 `country` / `asn` / `colo` / `timezone`（全取自 `request.cf`）——与 loginbase v1 同一结论 |
+| 原始 IP | **不存**。只留 `country` / `asn` / `colo` / `timezone`（全取自 `request.cf`） |
+| `city` / `region` | **只有服务端事件落**（`source='server'`）；客户端摄取路径刻意不写。身份类判据要比对同一账户两次登录的城市，那些全是服务端事件；浏览、点击这类行为事件没有城市精度的需求，不扩大采集面 |
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
 | `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如崩溃上报 SDK 的设备 id），由它注入并自行申报 |
@@ -390,7 +392,7 @@ CREATE TABLE dim_identity_daily (
 
 - ~~表结构：server / client 事件同表靠 `source` 区分~~ → 12.1
 - ~~摄取端点形态：批量 body、限流维度、单批上限~~ → 12.3
-- ~~loginbase 调本库 writer 的接口形态（决策 4）~~ → 12.7；仍未定的是签名细节：writer 必须拿到请求上下文（地理六项取自 `request.cf`），签名要能传；以及 loginbase 侧 `stats.enabled` 与 `auth_events` 的退役步骤
+- ~~loginbase 调本库 writer 的接口形态（决策 4）~~ → 12.7；~~签名细节：writer 必须拿到请求上下文~~ → **已就绪**：`TrackContext` 带 `request`（地理六项由 `geoOf` 自取），`ServerEvent` 带 `flowId` / `installId`，loginbase 侧只需适配 `c.req.raw` 与 `executionCtx.waitUntil`。仍未定的只剩 loginbase 侧 `stats.enabled` 与 `auth_events` 的退役步骤
 - 客户端侧的同构问题：`loginbase-kt` 是否依赖埋点 KMP 库 → 12.8 第 4 条，**倾向不连**
 - ~~session 的定义由谁给~~ → 12.5：客户端算，且必须带后台唤醒标记
 - ~~**`install_id` ↔ `identity_id` 映射**~~ → 12.2 `install_identity` 表；补登不回填。原文：（拆库的先决条件，见 4.3）：靠登录成功事件带 `user_id` 写进埋点库；补登（老用户升级后首次登录前）怎么处理、一机多账号与一账号多机怎么表达

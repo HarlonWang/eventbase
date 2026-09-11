@@ -4,10 +4,11 @@ import locale from "../migrations/0002_install_locale.sql?raw";
 import drops from "../migrations/0003_ingest_drops.sql?raw";
 import eventId from "../migrations/0004_event_id.sql?raw";
 import deviceId from "../migrations/0005_device_id.sql?raw";
+import geoCity from "../migrations/0006_geo_city_region.sql?raw";
 import { createIngest, createQuery } from "../src/index";
 
 export async function initDb() {
-  for (const stmt of [schema, locale, drops, eventId, deviceId].join(";").split(";").filter((s) => s.trim())) {
+  for (const stmt of [schema, locale, drops, eventId, deviceId, geoCity].join(";").split(";").filter((s) => s.trim())) {
     // ALTER TABLE ADD COLUMN 没有 IF NOT EXISTS，重复 initDb 时只能靠吞这一种错
     await env.DB.prepare(stmt)
       .run()
