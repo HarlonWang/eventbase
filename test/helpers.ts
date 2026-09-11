@@ -66,6 +66,8 @@ export interface EventRow {
   is_debug: number;
   event_at: number;
   received_at: number;
+  city: string | null;
+  region: string | null;
   props: string | null;
 }
 
