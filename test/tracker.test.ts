@@ -22,7 +22,7 @@ describe("服务端事件", () => {
     expect(JSON.parse(row.props!)).toEqual({ step: "completed" });
   });
 
-  it("落 city / region，客户端摄取路径则不落", async () => {
+  it("落 city / region", async () => {
     const cf = new Request("https://api.example.com/api/checkout", {
       cf: { country: "CL", asn: 22047, colo: "EZE", timezone: "America/Santiago", city: "Santiago", region: "Santiago Metropolitan" },
     } as RequestInit);

@@ -151,7 +151,7 @@ D1 文档原话：**每个数据库本身是单线程的，一次只处理一个
 | 导出 | 谁用 | 作用 |
 |---|---|---|
 | `createIngest({ db, limiter, adminToken, … })` | 挂在 Worker 的 `/t/*` | 公开摄取 + 带 token 的取数 |
-| `createTracker({ db })` | 业务代码、loginbase | 服务端 writer，直接写 D1 |
+| `createTracker(db)` | 业务代码、loginbase | 服务端 writer，直接写 D1 |
 | `migrations/` | 消费方 | 表结构随包分发 |
 
 ### 5.3 接入清单（新 App，约 15 分钟）
