@@ -106,7 +106,7 @@ CREATE TABLE events (
   channel      TEXT,                      -- github | play | fdroid | r2 | ...（值域由消费方定）
   sys_locale   TEXT,
   country      TEXT, asn INTEGER, colo TEXT, timezone TEXT,   -- 全部取自 request.cf
-  city         TEXT, region TEXT,           -- 同上，但只有 source='server' 会填，见 13.1
+  city         TEXT, region TEXT,           -- 同上
   is_debug     INTEGER NOT NULL DEFAULT 0,
   ingest_flags TEXT,                      -- 入口打标：bot / bg_wake / diag / …
   props        TEXT                       -- JSON 单列（定），低频字段
@@ -317,7 +317,7 @@ CREATE TABLE dim_identity_daily (
 | 项 | 结论 |
 |---|---|
 | 原始 IP | **不存**。只留 `country` / `asn` / `colo` / `timezone`（全取自 `request.cf`） |
-| `city` / `region` | **只有服务端事件落**（`source='server'`）；客户端摄取路径刻意不写。身份类判据要比对同一账户两次登录的城市，那些全是服务端事件；浏览、点击这类行为事件没有城市精度的需求，不扩大采集面 |
+| `city` / `region` | 两条写入路径都落，与 `country` 同源同性质：都是 `request.cf` 给出的**出口 IP 归属**，不是用户位置，挂代理即失真。消费方按国家看用户分布时，城市是同一份 IP 判定的下一级粒度，不构成新的采集面 |
 | User-Agent | **不存**。客户端已显式上报 platform / app_version / locale，UA 无增量信息 |
 | `install_id` | 随机 UUID，卸载重装即变；**不使用任何设备标识符**（不取 ANDROID_ID / IDFV） |
 | `device_id` | 可选字段，**本服务与客户端库都不采集、不推导**，只透传消费方显式传入的值。设备标识符会牵出 Play 数据安全 / App Store 隐私标签 / GDPR 的单独申报，默认不带就不该让所有接入方承担这份义务；需要设备维度的 App 自己有权威源（如崩溃上报 SDK 的设备 id），由它注入并自行申报 |

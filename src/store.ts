@@ -30,8 +30,9 @@ export function eventStatements(
   const insert = db.prepare(
     `INSERT INTO events
        (received_at, event_at, day, name, source, event_id, install_id, user_id, session_id, flow_id,
-        device_id, app_version, platform, channel, sys_locale, country, asn, colo, timezone, is_debug, props)
-     VALUES (?, ?, ?, ?, 'client', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        device_id, app_version, platform, channel, sys_locale, country, asn, colo, timezone, city, region,
+        is_debug, props)
+     VALUES (?, ?, ?, ?, 'client', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   );
 
   return events.map((e) =>
@@ -54,6 +55,8 @@ export function eventStatements(
       geo.asn,
       geo.colo,
       geo.timezone,
+      geo.city,
+      geo.region,
       batch.sys.debug ? 1 : 0,
       e.props
     )
