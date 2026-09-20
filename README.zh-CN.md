@@ -62,6 +62,7 @@ const query = createQuery<Env>({
   db: (env) => env.EVENTS_DB,
   basePath: "/t/q",
   adminToken: (env) => env.EVENTBASE_ADMIN_TOKEN,  // 不配则整个取数面不挂载
+  corsOrigins: (env) => env.DASHBOARD_ORIGINS?.split(","), // 可选：允许跨域读取的页面 origin 白名单，不配则不发 CORS 头
 });
 
 export default {

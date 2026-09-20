@@ -62,6 +62,7 @@ const query = createQuery<Env>({
   db: (env) => env.EVENTS_DB,
   basePath: "/t/q",
   adminToken: (env) => env.EVENTBASE_ADMIN_TOKEN,  // omit it and the read surface never mounts
+  corsOrigins: (env) => env.DASHBOARD_ORIGINS?.split(","), // optional: page origins allowed to read cross-origin; omit for no CORS headers
 });
 
 export default {

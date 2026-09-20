@@ -23,6 +23,44 @@ describe("鉴权", () => {
   });
 });
 
+describe("跨域", () => {
+  const origin = "https://dash.example.com";
+  const app = () => query({ corsOrigins: () => [origin] });
+
+  it("默认不发 CORS 头", async () => {
+    const res = await get(query(), "/");
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+
+  it("白名单内的 origin：预检不需要 token，正式请求带许可头", async () => {
+    const preflight = await app().request(
+      "/sql",
+      {
+        method: "OPTIONS",
+        headers: { Origin: origin, "Access-Control-Request-Method": "POST", "Access-Control-Request-Headers": "authorization,content-type" },
+      },
+      env
+    );
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+    expect(preflight.headers.get("Access-Control-Allow-Headers")).toMatch(/authorization/i);
+
+    const res = await app().request("/", { headers: { Origin: origin, Authorization: "Bearer test-admin-token" } }, env);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(origin);
+  });
+
+  it("白名单外的 origin 不发许可头，鉴权照旧", async () => {
+    const res = await app().request(
+      "/",
+      { headers: { Origin: "https://evil.example.com", Authorization: "Bearer test-admin-token" } },
+      env
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull();
+  });
+});
+
 describe("挂载前缀", () => {
   it("索引与指标都落在前缀下", async () => {
     const app = query({ basePath: "/t/q" });

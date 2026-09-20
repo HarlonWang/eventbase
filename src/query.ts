@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { cors } from "hono/cors";
 import { dayOf } from "./time.js";
 
 export interface QueryConfig<TEnv> {
@@ -7,6 +8,8 @@ export interface QueryConfig<TEnv> {
   basePath?: string;
   /** 未配置则整个取数面不挂载：宁可 404，也不要一个没有门的读接口 */
   adminToken: (env: TEnv) => string | undefined;
+  /** 允许跨域读取的页面 origin 白名单（精确匹配）；不配则不发任何 CORS 头 */
+  corsOrigins?: (env: TEnv) => readonly string[] | undefined;
   maxRows?: number;
 }
 
@@ -38,6 +41,18 @@ export function createQuery<TEnv extends object>(config: QueryConfig<TEnv>) {
   const prefix = config.basePath ?? "";
   const app = new Hono<{ Bindings: TEnv }>().basePath(prefix);
   const maxRows = config.maxRows ?? DEFAULT_MAX_ROWS;
+
+  // 先于鉴权：预检 OPTIONS 不带 Authorization，放在后面浏览器永远拿不到许可
+  app.use("*", async (c, next) => {
+    const origins = config.corsOrigins?.(c.env as TEnv);
+    if (!origins?.length) return next();
+    return cors({
+      origin: [...origins],
+      allowMethods: ["GET", "POST", "OPTIONS"],
+      allowHeaders: ["Authorization", "Content-Type"],
+      maxAge: 86400,
+    })(c, next);
+  });
 
   app.use("*", async (c, next) => {
     const expected = config.adminToken(c.env as TEnv);
