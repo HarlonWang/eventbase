@@ -1,6 +1,6 @@
 # 看板套件设计
 
-> 状态：P1～P3 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
+> 状态：P1～P4 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
 
 ## 1. 定位
 
@@ -12,7 +12,7 @@
 
 | 做 | 不做 |
 |---|---|
-| 取数客户端、筛选、KPI、五种卡片、深浅色（跟随系统 / 浅色 / 深色）、自适应宽度 | SQL 口径（归消费方） |
+| 取数客户端、筛选、KPI、六种卡片、深浅色（跟随系统 / 浅色 / 深色）、自适应宽度 | SQL 口径（归消费方） |
 | | 自定义主题 / 视觉调校：ECharts 默认风格 |
 | | 数据延迟提示（T+N 未定稿、「iOS 未到」） |
 | | 取数鉴权模型（沿用 admin token，页面如何持有 token 归消费方） |
@@ -39,7 +39,7 @@
 @whlong/eventbase/dashboard（本仓）
   ├─ 数据层：sql() 客户端、并发加载与过期丢弃、按卡隔离的错误
   ├─ 规格层：spec → ECharts option / DOM 参数
-  └─ 渲染层：ECharts（line / bar / funnel）+ DOM（table / KPI / 筛选）
+  └─ 渲染层：ECharts（line / bar / funnel / heatmap）+ DOM（table / KPI / 筛选）
 ```
 
 ## 4. 看板规格
@@ -96,7 +96,7 @@ kpis: [
 ```ts
 {
   title, note?: string | (ctx) => string, wide?: boolean,
-  type: "line" | "bar" | "funnel" | "table",
+  type: "line" | "bar" | "funnel" | "heatmap" | "table",
   sql: (ctx) => string | string[],          // 多条并发
   data: (results, ctx) => Source,            // results: 每条 SQL 一组 rows；单条时写 ([rows]) => …
                                              // Source = ECharts dataset.source：首行表头、首列 x、其余每列一条序列
@@ -105,6 +105,7 @@ kpis: [
   // 类型专属
   horizontal?: boolean, stack?: boolean, topN?: number, otherLabel?: string,   // bar
   yMax?: number,                                           // line
+  max?: number,                                            // heatmap：色阶上限，缺省取格值最大值
 }
 ```
 
@@ -117,6 +118,7 @@ kpis: [
 | `line` | ECharts line，`tooltip.trigger: 'axis'` | 趋势：活跃与新增、会话时长、渗透率 |
 | `bar` | ECharts bar；`horizontal` 时按数值降序、`topN` 之外并为「其他」；`stack` 堆叠 | 构成随时间、类目分布、按类目的结果构成 |
 | `funnel` | `bar` 的预设：横向、按步骤顺序、标签「人数（占首步 %）」 | 登录 / 注册 / 订阅漏斗 |
+| `heatmap` | ECharts heatmap；`data()` 返回宽表（首列行名、表头列名），内部转长表；`null` 不出格，色阶 `visualMap` 置底；行多时卡片自动加高 | 队列留存（行 = 注册日、列 = D1/D7/D30） |
 | `table` | DOM 表格，单元格可为 `{ text, tone: "bad" \| "dim" }`，超高内滚动 | 队列留存、明细、排行、多组对比 |
 | KPI | DOM | §4.3 |
 
@@ -153,7 +155,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.10.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.11.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -168,5 +170,6 @@ dashboard/
 | P1 ✅ | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
 | P2 ✅ | 配色三档切换（0.8.0）、同批次 SQL 去重（0.9.0）；私有消费方迁移并部署 | 同上 |
 | P3 ✅ | KPI 对比昨日同时段（0.10.0） | 同上 |
+| P4 ✅ | 热力图卡片（0.11.0） | 同上 |
 
-**待办**（逐项评估后再加）：样本量提示、版本发布标注、留存热力图、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。
+**待办**（逐项评估后再加）：样本量提示、版本发布标注、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。

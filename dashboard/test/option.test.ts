@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareText, formatter } from "../src/format";
-import { barOption, funnelOption, lineOption } from "../src/option";
+import { barOption, funnelOption, heatmapHeight, heatmapOption, lineOption } from "../src/option";
 import { memoize } from "../src/fetch";
 import { mergeTail } from "../src/source";
 import { colorScheme, currentMode, isDark, setMode, subscribeMode } from "../src/theme";
@@ -98,6 +98,48 @@ describe("funnelOption", () => {
     expect(label({ value: ["打开", 200] })).toBe("200（100%）");
     expect(label({ value: ["成功", 50] })).toBe("50（25%）");
     expect(label({ value: ["未埋点", null] })).toBe("无数据");
+  });
+});
+
+describe("heatmapOption", () => {
+  const cohorts: Source = [["队列", "D1", "D7"], ["2026-09-01", 40, 0], ["2026-09-02", 35.5, null]];
+  type H = {
+    dataset: { source: unknown[][] };
+    xAxis: { data: string[] };
+    yAxis: { data: string[]; inverse: boolean };
+    visualMap: { max: number };
+  };
+
+  it("宽表转长表；null 不出格，0 照常出格", () => {
+    const o = heatmapOption(cohorts) as H;
+    expect(o.dataset.source).toEqual([
+      ["x", "y", "v"], ["D1", "2026-09-01", 40], ["D7", "2026-09-01", 0], ["D1", "2026-09-02", 35.5],
+    ]);
+  });
+
+  it("行列顺序按宽表，首行在上；色阶上限缺省取最大值，可覆盖", () => {
+    const o = heatmapOption(cohorts) as H;
+    expect(o.xAxis.data).toEqual(["D1", "D7"]);
+    expect(o.yAxis).toMatchObject({ data: ["2026-09-01", "2026-09-02"], inverse: true });
+    expect(o.visualMap.max).toBe(40);
+    expect((heatmapOption(cohorts, { max: 100 }) as H).visualMap.max).toBe(100);
+  });
+
+  it("tooltip 带行名与列名，消费方文本转义后再进 HTML", () => {
+    const o = heatmapOption([["c", "D1"], ["<b>", 40]], { format: "pct" }) as {
+      tooltip: { formatter: (p: unknown) => string };
+    };
+    expect(o.tooltip.formatter({ marker: "•", value: ["D1", "<b>", 40] })).toBe("&#60;b&#62;<br>•D1　<b>40%</b>");
+  });
+
+  it("全为 null 时色阶上限为 0，不出 -Infinity", () => {
+    expect((heatmapOption([["c", "D1"], ["a", null]]) as H).visualMap.max).toBe(0);
+  });
+
+  it("行多时加高，行少时不低于默认高度", () => {
+    expect(heatmapHeight(cohorts)).toBe(300);
+    const many: Source = [["c", "D1"], ...Array.from({ length: 30 }, (_, i) => [`r${i}`, i])];
+    expect(heatmapHeight(many)).toBe(30 * 24 + 140);
   });
 });
 

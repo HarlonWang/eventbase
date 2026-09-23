@@ -2,7 +2,7 @@ import type { ECharts, EChartsOption } from "echarts";
 import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { memoize } from "./fetch.js";
 import { compareText, formatter } from "./format.js";
-import { barOption, funnelOption, lineOption } from "./option.js";
+import { barOption, funnelOption, heatmapHeight, heatmapOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
 import { currentMode, isDark, setMode, subscribeMode, THEME_MODES } from "./theme.js";
 import { addDays, dayList, todayOf } from "./time.js";
@@ -38,6 +38,7 @@ function chartOption(spec: CardSpec, source: Source): EChartsOption {
   switch (spec.type) {
     case "line": return lineOption(source, spec);
     case "bar": return barOption(source, spec);
+    case "heatmap": return heatmapOption(source, spec);
     default: return funnelOption(source, spec);
   }
 }
@@ -158,6 +159,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     const empty = source.length < 2;
     v.chart.hidden = empty;
     v.empty.hidden = !empty;
+    v.chart.style.height = s.type === "heatmap" ? `${heatmapHeight(source)}px` : "";
     if (!empty) draw(v.chart, chartOption(s, source));
     renderFoot(v.foot, s.foot?.(source as never, ctx, results));
   };

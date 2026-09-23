@@ -86,3 +86,49 @@ export function funnelOption(source: Source, opts: { format?: Format } = {}): EC
     }],
   };
 }
+
+const ROW_PX = 24;
+
+const escapeHtml = (v: unknown) =>
+  String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+
+/** 行数多时卡片随之加高，保证每格可读 */
+export const heatmapHeight = (source: Source): number => Math.max(300, (source.length - 1) * ROW_PX + 140);
+
+/** 宽表转 heatmap 所需的 [列, 行, 值] 长表；null 不出格（D6：无数据不画成 0） */
+export function heatmapOption(source: Source, opts: { format?: Format; max?: number } = {}): EChartsOption {
+  const fmt = formatter(opts.format);
+  const [head = [], ...rows] = source;
+  const cells: (string | number)[][] = [];
+  for (const r of rows) {
+    head.slice(1).forEach((col, i) => {
+      const v = r[i + 1];
+      if (typeof v === "number") cells.push([String(col), String(r[0]), v]);
+    });
+  }
+  const max = opts.max ?? Math.max(0, ...cells.map((c) => c[2] as number));
+  return {
+    ...BASE,
+    grid: { top: 56, bottom: 56 },
+    tooltip: {
+      trigger: "item",
+      formatter: (p: unknown) => {
+        const { marker, value } = p as { marker: string; value: unknown[] };
+        return `${escapeHtml(value[1])}<br>${marker}${escapeHtml(value[0])}　<b>${escapeHtml(fmt(value[2]))}</b>`;
+      },
+    },
+    dataset: { source: [["x", "y", "v"], ...cells] },
+    xAxis: { type: "category", position: "top", data: head.slice(1).map(String), splitArea: { show: true } },
+    yAxis: { type: "category", inverse: true, data: rows.map((r) => String(r[0])), axisLabel: { formatter: dayLabel } },
+    visualMap: {
+      min: 0, max, calculable: true, orient: "horizontal", left: "center", bottom: 0,
+      formatter: (v: unknown) => fmt(v),
+    },
+    series: [{
+      type: "heatmap",
+      encode: { x: 0, y: 1, value: 2 },
+      label: { show: true, formatter: (p: { value: unknown }) => fmt((p.value as unknown[])[2]) },
+      labelLayout: { hideOverlap: true },
+    }],
+  };
+}

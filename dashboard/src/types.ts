@@ -68,7 +68,16 @@ export interface TableCard extends CardBase {
   foot?: (data: TableData, ctx: Ctx, results: Results) => Foot | Foot[] | undefined;
 }
 
-export type CardSpec = LineCard | BarCard | FunnelCard | TableCard;
+export interface HeatmapCard extends CardBase {
+  type: "heatmap";
+  /** 首列行名（如队列日），表头为列名（如 D1、D7），格值为 null 时留空 */
+  data: (results: Results, ctx: Ctx) => Source;
+  /** 色阶上限，缺省取格值最大值 */
+  max?: number;
+  foot?: (data: Source, ctx: Ctx, results: Results) => Foot | Foot[] | undefined;
+}
+
+export type CardSpec = LineCard | BarCard | FunnelCard | HeatmapCard | TableCard;
 
 export interface KpiTile {
   label: string;
