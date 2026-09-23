@@ -10,6 +10,9 @@ const CSS = `
 .eb-box { border: 1px solid color-mix(in srgb, currentColor 16%, transparent); border-radius: 8px; padding: 12px 14px; }
 .eb-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin: 14px 0; }
 .eb-kpi-v { font-size: 28px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.eb-delta { font-size: 12px; opacity: .75; font-variant-numeric: tabular-nums; }
+.eb-delta.eb-up { color: #188038; opacity: 1; }
+.eb-delta.eb-down { color: #d93025; opacity: 1; }
 .eb-kpi-list { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; font-variant-numeric: tabular-nums; }
 .eb-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 14px 0; }
 .eb-filters button[aria-pressed="true"] { font-weight: 700; }

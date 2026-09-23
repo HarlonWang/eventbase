@@ -1,7 +1,7 @@
 import type { ECharts, EChartsOption } from "echarts";
 import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { memoize } from "./fetch.js";
-import { formatter } from "./format.js";
+import { compareText, formatter } from "./format.js";
 import { barOption, funnelOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
 import { currentMode, isDark, setMode, subscribeMode, THEME_MODES } from "./theme.js";
@@ -177,6 +177,10 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
       const box = host.appendChild(el("div", "eb-box"));
       box.appendChild(el("div", "eb-muted", t.label));
       box.appendChild(el("div", "eb-kpi-v", formatter(t.format)(t.value)));
+      if (t.compare) {
+        const c = compareText(t.value, t.compare.value, t.compare.label, t.format);
+        box.appendChild(el("div", `eb-delta${c.dir ? ` eb-${c.dir}` : ""}`, c.text));
+      }
       if (t.hint) box.appendChild(el("div", "eb-muted", t.hint));
     }
   };

@@ -82,12 +82,13 @@ sql: (ctx) => `SELECT … WHERE day BETWEEN '${ctx.from}' AND '${ctx.to}' AND ${
 
 ```ts
 kpis: [
-  { sql: (ctx) => [...], tiles: (results, ctx) => [{ label: "DAU（今日实时）", value, format?, hint? }] },
+  { sql: (ctx) => [...], tiles: (results, ctx) => [{ label: "DAU（今日实时）", value, format?, hint?, compare?: { value, label } }] },
   { layout: "list", sql, tiles },   // 多个指标竖排在一张卡里
 ]
 ```
 
-- 只展示**今日实时值**，不展示昨日、不做较前日变化：今日是不完整的一天，与完整的前一天比较没有意义。
+- 只展示**今日实时值**，不展示昨日全天：今日是不完整的一天，与完整的前一天比较没有意义。
+- 涨跌对比用 `compare: { value, label }`，对照值须与今日同口径——推荐「昨日同时段」：昨日事件按 `received_at <= now - 24h` 截断，时长与数据到达状态都对等（按 `event_at` 截会把昨日后补的 iOS 晚到事件算进来，昨日系统性偏高）。
 - 是否吃筛选由 SQL 自己决定（不引用 `ctx.state` 即为全局快照）。
 
 ### 4.4 卡片
@@ -152,7 +153,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.9.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.10.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -165,6 +166,7 @@ dashboard/
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | P1 ✅ | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
-| P2 | 配色三档切换（0.8.0）、同批次 SQL 去重（0.9.0）；私有消费方迁移并部署 | 同上 |
+| P2 ✅ | 配色三档切换（0.8.0）、同批次 SQL 去重（0.9.0）；私有消费方迁移并部署 | 同上 |
+| P3 | KPI 对比昨日同时段（0.10.0） | 同上 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、留存热力图、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。
