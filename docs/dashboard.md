@@ -1,6 +1,6 @@
 # 看板套件设计
 
-> 状态：**已拍板，待实施**（2026-09-23）。落地时同步改 `design.md` §6.1 产物表与 `telemetry-design.md`「v1 不做看板 UI」两处。
+> 状态：P1 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
 
 ## 1. 定位
 
@@ -49,12 +49,14 @@
 mount(el, {
   api: { base: "https://…/t/q", token },
   title: "…",
-  freshness?: { sql, value: (row) => Date },    // 页头「最新一条事件到库于 X 前」
+  subtitle?: "…",                               // 标题旁的口径说明
+  freshness?: { sql, at: (results) => ms },     // 页头「最新一条事件到库于 X 前」
   links?: [{ text, href }],
   guide?: { summary, items: string[] },         // 「读数前必读」折叠块
   filters: FilterSpec,
-  kpis?: KpiSpec[],
+  kpis?: KpiGroup[],
   cards: CardSpec[],
+  tzOffsetHours?: 8,                            // 日界时区，与 day 列一致
 });
 ```
 
@@ -63,7 +65,7 @@ mount(el, {
 ```ts
 filters: {
   ranges: { options: [7, 14, 30], default: 14 },
-  selects: [{ key, label, options: [...] | { sql, value } }],  // 静态或启动时查一次
+  selects: [{ key, label, options: [...] | { sql, values: (rows) => [...] } }],  // 静态或启动时查一次
   toggles: [{ key, label, default: false }],
 }
 ```
@@ -72,33 +74,34 @@ filters: {
 
 ```ts
 sql: (ctx) => `SELECT … WHERE day BETWEEN '${ctx.from}' AND '${ctx.to}' AND ${myWhere(ctx)}`
-// ctx = { from, to, days: string[], today, state: { … }, esc }
+// ctx = { from, to, days: string[], today, state: { … }, esc, addDays }
 ```
 
 ### 4.3 KPI
 
 ```ts
 kpis: [
-  { type: "value", label: "DAU（今日）", sql, value: (r) => r.dau, filtered: true },
-  { type: "list", sql, rows: [{ label, value, format }], filtered: false },
+  { sql: (ctx) => [...], tiles: (results, ctx) => [{ label: "DAU（今日实时）", value, format?, hint? }] },
+  { layout: "list", sql, tiles },   // 多个指标竖排在一张卡里
 ]
 ```
 
 - 只展示**今日实时值**，不展示昨日、不做较前日变化：今日是不完整的一天，与完整的前一天比较没有意义。
-- `filtered` 决定是否吃筛选。
+- 是否吃筛选由 SQL 自己决定（不引用 `ctx.state` 即为全局快照）。
 
 ### 4.4 卡片
 
 ```ts
 {
-  id, title, note?, wide?: boolean,
+  title, note?: string | (ctx) => string, wide?: boolean,
   type: "line" | "bar" | "funnel" | "table",
-  sql: (ctx) => string | string[],          // 多条并发，rows 按序传入 data()
-  data: (rows, ctx) => Source,               // ECharts dataset.source 形态：首行为表头的二维数组
+  sql: (ctx) => string | string[],          // 多条并发
+  data: (results, ctx) => Source,            // results: 每条 SQL 一组 rows；单条时写 ([rows]) => …
+                                             // Source = ECharts dataset.source：首行表头、首列 x、其余每列一条序列
   format?: "int" | "pct" | "dur" | (v) => string,
-  foot?: (source, ctx) => (string | { text, warn: true })[],
+  foot?: (data, ctx, results) => Foot | Foot[],   // Foot = string | { text, warn: true }
   // 类型专属
-  horizontal?: boolean, stack?: boolean, topN?: number,   // bar
+  horizontal?: boolean, stack?: boolean, topN?: number, otherLabel?: string,   // bar
   yMax?: number,                                           // line
 }
 ```
@@ -120,7 +123,8 @@ kpis: [
 ## 5. ECharts 用法约定
 
 - 数据走 `dataset` + `encode`，不手拼 `series.data`。
-- `legend`、`tooltip`、`grid.containLabel` 用默认组件；`toolbox` 开 `dataView`（看数据表）与 `saveAsImage`。
+- `legend`、`tooltip` 用默认组件；`toolbox` 开 `dataView`（看数据表）与 `saveAsImage`。
+- 坐标轴标签避让用 ECharts 6 默认的 `grid.outerBounds`（`containLabel` 已废弃）；柱末端数值标签不在避让范围内，横向柱与漏斗在右侧固定留白。
 - `aria.enabled: true`。
 - 每个图表容器挂 `ResizeObserver` → `chart.resize()`。
 - 刷新数据 `setOption(option, { notMerge: true })`。
@@ -135,7 +139,7 @@ kpis: [
 ```
 dashboard/
   src/            # TS，DOM lib，与 Worker 侧 src/ 分开的 tsconfig
-  test/           # spec → ECharts option 的纯函数测试（node 环境，不走 workers pool）
+  test/           # spec → ECharts option 的纯函数测试（随根目录 vitest 一起跑）
   example.html    # 最小可跑页面，同时是消费方模板
 ```
 
@@ -157,7 +161,7 @@ dashboard/
 
 | 阶段 | 内容 | 验收 |
 |---|---|---|
-| P1 | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完，旧 `dashboard.html` 删除 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
+| P1 ✅ | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
 | P2 | 卡片「SQL」按钮；私有消费方迁移并部署 | 同上 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、留存热力图、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。

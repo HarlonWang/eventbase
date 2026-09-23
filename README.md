@@ -21,6 +21,7 @@ eventbase mounts into a Worker you already run. Events land in **your** D1, and 
 - **Loss is accountable.** Rejected and dropped batches are counted by day and reason in `ingest_drops`. Together with the client's diagnostic log, that pins a missing event on one of three causes: never tracked, lost in transit, or refused by the server.
 - **Your D1, your data.** Table definitions ship inside the package; point `migrations_dir` at it and you're done. Nothing leaves your Cloudflare account, and there is no third party to trust with user behaviour.
 - **Server-side events too.** `createTracker` writes from inside your Worker, so the moments a client can't observe — a quota rejection, a completed payment — land in the same table and join up with client events through `flow_id`.
+- **A ready-made browser dashboard.** `@whlong/eventbase/dashboard` turns the query surface into a single-file HTML dashboard: you write the filters, the cards and each card's SQL, ECharts draws them, no build step. See the [dashboard kit](docs/dashboard.md).
 - **A client that handles the hard parts.** [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) gives you an offline queue, batching, backoff and lifecycle events, and it collects no device identifiers at all.
 
 ## Quick start
@@ -118,6 +119,7 @@ No session replay, no A/B testing, and no user profile store — eventbase recor
 | [Ingestion protocol](docs/protocol.md) | The wire contract — single source of truth for both halves |
 | [Telemetry design](docs/telemetry-design.md) | Naming conventions, metric definitions, the four-layer model |
 | [Design decisions](docs/design.md) | Deployment topology, integration shapes, why the repos are split |
+| [Dashboard kit](docs/dashboard.md) | Browser dashboard: write a spec (filters, cards, SQL), ECharts renders it (Chinese) |
 
 ## License
 
