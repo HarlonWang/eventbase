@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { formatter } from "../src/format";
 import { barOption, funnelOption, lineOption } from "../src/option";
 import { mergeTail } from "../src/source";
+import { colorScheme, currentMode, isDark, setMode, subscribeMode } from "../src/theme";
 import type { Source } from "../src/types";
 
 const days: Source = [["day", "DAU", "新增"], ["2026-09-01", 3, 1], ["2026-09-02", null, 0]];
@@ -96,5 +97,41 @@ describe("funnelOption", () => {
     expect(label({ value: ["打开", 200] })).toBe("200（100%）");
     expect(label({ value: ["成功", 50] })).toBe("50（25%）");
     expect(label({ value: ["未埋点", null] })).toBe("无数据");
+  });
+});
+
+describe("配色模式", () => {
+  it("跟随系统时看系统，手动选择时无视系统", () => {
+    expect(isDark("auto", true)).toBe(true);
+    expect(isDark("auto", false)).toBe(false);
+    expect(isDark("light", true)).toBe(false);
+    expect(isDark("dark", false)).toBe(true);
+  });
+
+  it("html 的 color-scheme：跟随系统时两者都声明", () => {
+    expect(colorScheme("auto")).toBe("light dark");
+    expect(colorScheme("dark")).toBe("dark");
+  });
+});
+
+describe("配色是页面级共享状态", () => {
+  it("任一实例切换时全部收到通知；最后一个退订才还原 <html>", () => {
+    const html = { style: { colorScheme: "normal" } };
+    (globalThis as { document?: unknown }).document = { documentElement: html };
+    const seen: string[] = [];
+    const offA = subscribeMode(() => seen.push(`A:${currentMode()}`));
+    const offB = subscribeMode(() => seen.push(`B:${currentMode()}`));
+    expect(html.style.colorScheme).toBe("light dark");
+
+    setMode("dark");
+    expect(seen).toEqual(["A:dark", "B:dark"]);
+    expect(html.style.colorScheme).toBe("dark");
+
+    offB();
+    offB();
+    expect(html.style.colorScheme).toBe("dark");
+    offA();
+    expect(html.style.colorScheme).toBe("normal");
+    delete (globalThis as { document?: unknown }).document;
   });
 });

@@ -12,10 +12,11 @@
 
 | 做 | 不做 |
 |---|---|
-| 取数客户端、筛选、KPI、五种卡片、深浅色、自适应宽度 | SQL 口径（归消费方） |
+| 取数客户端、筛选、KPI、五种卡片、深浅色（跟随系统 / 浅色 / 深色）、自适应宽度 | SQL 口径（归消费方） |
 | | 自定义主题 / 视觉调校：ECharts 默认风格 |
 | | 数据延迟提示（T+N 未定稿、「iOS 未到」） |
 | | 取数鉴权模型（沿用 admin token，页面如何持有 token 归消费方） |
+| | 卡片展示所执行的 SQL |
 
 ## 2. 决策
 
@@ -128,7 +129,7 @@ kpis: [
 - `aria.enabled: true`。
 - 每个图表容器挂 `ResizeObserver` → `chart.resize()`。
 - 刷新数据 `setOption(option, { notMerge: true })`。
-- `prefers-color-scheme` 变化时 `dispose()` 后以 `dark` 主题重建。
+- 配色三档：页头「跟随系统 / 浅色 / 深色」，选择存 localStorage（读取失败默认跟随系统；写入失败只对本次页面生效）；套件把 `color-scheme` 写到 `<html>`，页面背景与原生控件随之切换；图表切换时 `dispose()` 后以默认或 `dark` 主题重建。
 
 ## 6. 运行时
 
@@ -149,7 +150,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.7.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.8.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -162,6 +163,6 @@ dashboard/
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | P1 ✅ | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
-| P2 | 卡片「SQL」按钮；私有消费方迁移并部署 | 同上 |
+| P2 | 配色三档切换（0.8.0）；私有消费方迁移并部署 | 同上 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、留存热力图、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。

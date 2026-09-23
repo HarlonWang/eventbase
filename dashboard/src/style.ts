@@ -1,8 +1,9 @@
 const CSS = `
-.eb { color-scheme: light dark; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 1440px; margin: 0 auto; padding: 16px; }
+.eb { font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; max-width: 1440px; margin: 0 auto; padding: 16px; }
 .eb h1 { font-size: 20px; margin: 0; }
 .eb-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; }
-.eb-links { margin-left: auto; display: flex; gap: 12px; }
+.eb-tools { margin-left: auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+.eb-tools button[aria-pressed="true"] { font-weight: 700; }
 .eb-muted { opacity: .65; font-size: 12px; }
 .eb-guide { margin: 10px 0 0; }
 .eb-guide ol { margin: 6px 0; padding-left: 22px; }
