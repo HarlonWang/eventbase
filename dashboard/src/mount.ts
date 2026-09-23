@@ -1,6 +1,7 @@
 import type { ECharts, EChartsOption } from "echarts";
 import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { memoize } from "./fetch.js";
+import { lazyLoader } from "./lazy.js";
 import { pivot } from "./source.js";
 import { compareText, formatter } from "./format.js";
 import { barOption, funnelOption, heatmapOption, lineOption } from "./option.js";
@@ -131,7 +132,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   };
 
   const cards: CardView[] = spec.cards.map((c) => {
-    const box = grid.appendChild(el("section", `eb-box eb-card${c.wide ? " wide" : ""}`));
+    const box = grid.appendChild(el("section", `eb-box eb-card eb-unloaded${c.wide ? " wide" : ""}`));
     const h = box.appendChild(el("header"));
     h.appendChild(el("h2", "", c.title));
     const view: CardView = {
@@ -208,41 +209,69 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     };
   };
 
+  interface Round {
+    seq: number;
+    ctx: Ctx;
+    runAll: (q: string | string[]) => Promise<Results>;
+    failures: string[];
+  }
+  let round: Round = { seq, ctx: ctxNow(), runAll: batch(), failures: [] };
+  const guard = async (r: Round, task: () => Promise<void>, onError: (msg: string) => void) => {
+    try {
+      await task();
+    } catch (e) {
+      if (r.seq !== seq) return;
+      const msg = e instanceof Error ? e.message : String(e);
+      r.failures.push(msg);
+      onError(msg);
+      banner.hidden = false;
+      banner.textContent = `${r.failures.length} 处取数失败：${r.failures[0]}`;
+    }
+  };
+
+  const loadCard = (v: CardView): Promise<void> => {
+    const r = round;
+    return guard(r, async () => {
+      v.root.classList.add("eb-loading");
+      const results = await r.runAll(v.spec.sql(r.ctx)).finally(() => v.root.classList.remove("eb-loading"));
+      if (r.seq !== seq) return;
+      v.root.classList.remove("eb-unloaded");
+      v.error.hidden = true;
+      renderCard(v, results, r.ctx);
+    }, (msg) => {
+      v.root.classList.remove("eb-unloaded");
+      v.error.textContent = `取数失败：${msg}`;
+      v.error.hidden = false;
+      v.chart.hidden = v.table.hidden = v.empty.hidden = v.foot.hidden = true;
+    });
+  };
+
+  const lazy = spec.lazy !== false && typeof IntersectionObserver !== "undefined"
+    ? lazyLoader<CardView>((v) => void loadCard(v))
+    : null;
+  const byRoot = new Map(cards.map((v) => [v.root as Element, v]));
+  const io = lazy && new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const v = byRoot.get(e.target);
+      if (v) (e.isIntersecting ? lazy.show : lazy.hide)(v);
+    }
+  }, { rootMargin: "300px 0px" });
+  for (const v of cards) io?.observe(v.root);
+
   async function reload(): Promise<void> {
-    const my = ++seq;
-    const ctx = ctxNow();
-    const runAll = batch();
+    const r: Round = round = { seq: ++seq, ctx: ctxNow(), runAll: batch(), failures: [] };
+    const { ctx, runAll } = r;
     for (const v of cards) {
       const n = v.spec.note;
       v.note.textContent = typeof n === "function" ? n(ctx) : (n ?? "");
     }
-    const failures: string[] = [];
-    const guard = async (task: () => Promise<void>, onError: (msg: string) => void) => {
-      try {
-        await task();
-      } catch (e) {
-        if (my !== seq) return;
-        const msg = e instanceof Error ? e.message : String(e);
-        failures.push(msg);
-        onError(msg);
-      }
-    };
+    banner.hidden = true;
     const tasks = [
-      ...cards.map((v) => guard(async () => {
-        v.root.classList.add("eb-loading");
-        const results = await runAll(v.spec.sql(ctx)).finally(() => v.root.classList.remove("eb-loading"));
-        if (my !== seq) return;
-        v.error.hidden = true;
-        renderCard(v, results, ctx);
-      }, (msg) => {
-        v.error.textContent = `取数失败：${msg}`;
-        v.error.hidden = false;
-        v.chart.hidden = v.table.hidden = v.empty.hidden = v.foot.hidden = true;
-      })),
-      ...(spec.kpis ?? []).map((g, i) => guard(async () => {
+      ...(lazy ? lazy.invalidate(cards) : cards).map(loadCard),
+      ...(spec.kpis ?? []).map((g, i) => guard(r, async () => {
         for (const box of kpiHosts[i].children) box.classList.add("eb-loading");
         const results = await runAll(g.sql(ctx));
-        if (my === seq) renderKpis(kpiHosts[i], g, results, ctx);
+        if (r.seq === seq) renderKpis(kpiHosts[i], g, results, ctx);
       }, (msg) => {
         kpiHosts[i].textContent = "";
         kpiHosts[i].appendChild(el("div", "eb-box eb-error", `取数失败：${msg}`));
@@ -250,16 +279,13 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     ];
     if (spec.freshness) {
       const f = spec.freshness;
-      tasks.push(guard(async () => {
+      tasks.push(guard(r, async () => {
         const at = f.at(await runAll(f.sql));
-        if (my === seq) fresh.textContent = at == null ? "" : `最新一条事件到库于 ${ago(at)}前`;
+        if (r.seq === seq) fresh.textContent = at == null ? "" : `最新一条事件到库于 ${ago(at)}前`;
       }, () => { fresh.textContent = ""; }));
     }
     await Promise.all(tasks);
-    if (my !== seq) return;
-    banner.hidden = failures.length === 0;
-    banner.textContent = failures.length ? `${failures.length} 处取数失败：${failures[0]}` : "";
-    stamp.textContent = `已刷新 ${new Date().toLocaleTimeString("zh-CN")}`;
+    if (r.seq === seq) stamp.textContent = `已刷新 ${new Date().toLocaleTimeString("zh-CN")}`;
   }
 
   if (filters.ranges) {
@@ -315,6 +341,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     dark.removeEventListener("change", onSystemChange);
     unsubscribe();
     ro.disconnect();
+    io?.disconnect();
     for (const c of charts.values()) c.inst.dispose();
     charts.clear();
     root.textContent = "";

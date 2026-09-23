@@ -20,6 +20,7 @@ const CSS = `
 .eb-stamp { margin-left: auto; }
 .eb-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(460px, 100%), 1fr)); gap: 14px; }
 .eb-card { min-width: 0; }
+.eb-card.eb-unloaded { min-height: 360px; }
 .eb-card.wide { grid-column: 1 / -1; }
 .eb-card h2 { font-size: 15px; margin: 0; display: inline; }
 .eb-card .eb-muted { margin-left: 8px; }

@@ -1,6 +1,6 @@
 # 看板套件设计
 
-> 状态：P1～P5 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
+> 状态：P1～P6 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
 
 ## 1. 定位
 
@@ -58,6 +58,7 @@ mount(el, {
   kpis?: KpiGroup[],
   cards: CardSpec[],
   tzOffsetHours?: 8,                            // 日界时区，与 day 列一致
+  lazy?: true,                                  // 卡片滚到视口附近才取数；false 为挂载即全部取数
 });
 ```
 
@@ -143,6 +144,8 @@ kpis: [
 
 同一次刷新内 SQL 文本相同只请求一次（多张卡共用一个聚合查询时不重复打 D1），各卡拿到各自的数组副本。加载中的卡片与 KPI 变淡，避免旧读数被当成新结果。
 
+**按需取数**（默认开）：D1 按读取行数计费，而多数访问只看首屏。卡片进入视口上下 300px 内才取数；筛选变化时只重取可见的卡，其余标记过期、滚到时再取（用最新筛选）。KPI 与新鲜度在页头，始终立即取。未加载的卡保留最小高度，避免塌缩后全部落进视口。后台标签页里浏览器不触发可见性回调，切到前台才开始取数。环境不支持 `IntersectionObserver` 时退回全部立即取数。
+
 ## 7. 工程
 
 ```
@@ -158,7 +161,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.12.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.13.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -175,5 +178,6 @@ dashboard/
 | P3 ✅ | KPI 对比昨日同时段（0.10.0） | 同上 |
 | P4 ✅ | 热力图、矩阵表（0.11.0） | 同上 |
 | P5 ✅ | 热力图等高、去色阶条与色带、`rowHint`（0.12.0） | 同上 |
+| P6 ✅ | 卡片滚到才取数（0.13.0） | 首屏外的卡不发请求；筛选变化只重取可见卡 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。
