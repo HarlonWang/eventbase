@@ -29,6 +29,7 @@ const CSS = `
 .eb-table th, .eb-table td { padding: 5px 8px; white-space: nowrap; border-bottom: 1px solid color-mix(in srgb, currentColor 12%, transparent); text-align: left; }
 .eb-table th { position: sticky; top: 0; background: Canvas; font-weight: 500; color: color-mix(in srgb, currentColor 70%, Canvas); }
 .eb-table .num { text-align: right; }
+.eb-table .eb-heat { background: color-mix(in srgb, #5470c6 var(--eb-heat), transparent); }
 .eb-foot { font-size: 12px; opacity: .7; margin-top: 6px; }
 .eb-empty { padding: 40px 0; text-align: center; opacity: .6; }
 .eb-error { color: #d93025; }
