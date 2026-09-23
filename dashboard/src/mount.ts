@@ -1,6 +1,7 @@
 import type { ECharts, EChartsOption } from "echarts";
 import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { memoize } from "./fetch.js";
+import { pivot } from "./source.js";
 import { compareText, formatter } from "./format.js";
 import { barOption, funnelOption, heatmapHeight, heatmapOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
@@ -146,12 +147,13 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
 
   const renderCard = (v: CardView, results: Results, ctx: Ctx) => {
     const s = v.spec;
-    if (s.type === "table") {
-      const data: TableData = s.data(results, ctx);
+    if (s.type === "table" || s.type === "matrix") {
+      const { data, heat }: { data: TableData; heat?: (number | null)[][] } =
+        s.type === "table" ? { data: s.data(results, ctx) } : pivot(s.data(results, ctx), s);
       v.table.textContent = "";
       v.table.hidden = data.rows.length === 0;
       v.empty.hidden = !v.table.hidden;
-      if (data.rows.length) renderTable(v.table, data, s.format);
+      if (data.rows.length) renderTable(v.table, data, s.format, heat);
       renderFoot(v.foot, s.foot?.(data, ctx, results));
       return;
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { compareText, formatter } from "../src/format";
 import { barOption, funnelOption, heatmapHeight, heatmapOption, lineOption } from "../src/option";
 import { memoize } from "../src/fetch";
-import { mergeTail } from "../src/source";
+import { mergeTail, pivot, type Triple } from "../src/source";
 import { colorScheme, currentMode, isDark, setMode, subscribeMode } from "../src/theme";
 import type { Source } from "../src/types";
 
@@ -136,10 +136,62 @@ describe("heatmapOption", () => {
     expect((heatmapOption([["c", "D1"], ["a", null]]) as H).visualMap.max).toBe(0);
   });
 
+  it("数值字符串照常出格；NaN、Infinity、空串不出格", () => {
+    const o = heatmapOption([["c", "D1", "D2", "D3", "D4"], ["a", "40", "0", NaN, ""], ["b", Infinity, null, 5, "x"]]) as H;
+    expect(o.dataset.source.slice(1)).toEqual([["D1", "a", 40], ["D2", "a", 0], ["D3", "b", 5]]);
+  });
+
+  it("全为负数时色阶跟随数据", () => {
+    const o = heatmapOption([["c", "D1", "D2"], ["a", -5, -2]]) as { visualMap: { min: number; max: number } };
+    expect(o.visualMap).toMatchObject({ min: -5, max: -2 });
+  });
+
   it("行多时加高，行少时不低于默认高度", () => {
     expect(heatmapHeight(cohorts)).toBe(300);
     const many: Source = [["c", "D1"], ...Array.from({ length: 30 }, (_, i) => [`r${i}`, i])];
     expect(heatmapHeight(many)).toBe(30 * 24 + 140);
+  });
+});
+
+describe("pivot", () => {
+  const t: Triple[] = [["US", "organic", 5], ["CN", "organic", 20], ["CN", "ads", 3], ["US", "ads", 10], ["JP", "ads", null]];
+
+  it("行列按合计降序，缺失组合留 null，带合计行列", () => {
+    const { data } = pivot(t, { corner: "国家" });
+    expect(data.columns).toEqual(["国家", { label: "organic", num: true }, { label: "ads", num: true }, { label: "合计", num: true }]);
+    expect(data.rows).toEqual([
+      ["CN", 20, 3, 23],
+      ["US", 5, 10, 15],
+      ["JP", null, null, null],
+      ["合计", 25, 13, 38],
+    ]);
+  });
+
+  it("着色按主体最大值归一，首列、合计与无数据格不着色", () => {
+    const { heat } = pivot(t);
+    expect(heat[0]).toEqual([null, 1, 0.15, null]);
+    expect(heat[2]).toEqual([null, null, null, null]);
+    expect(heat[3].every((h) => h === null)).toBe(true);
+  });
+
+  it("同一格累加；数值字符串照常计入", () => {
+    const { data } = pivot([["a", "x", 1], ["a", "x", "2"]], { totals: false });
+    expect(data.rows).toEqual([["a", 3]]);
+  });
+
+  it("input 顺序保持首次出现；关掉合计时无合计行列", () => {
+    const { data } = pivot(t, { order: "input", totals: false });
+    expect(data.rows.map((r) => r[0])).toEqual(["US", "CN", "JP"]);
+    expect(data.columns).toHaveLength(3);
+  });
+
+  it("整列无数据时列合计为 null 而非 0", () => {
+    const { data } = pivot([["a", "x", 1], ["a", "y", null]]);
+    expect(data.rows.at(-1)).toEqual(["合计", 1, null, 1]);
+  });
+
+  it("空输入不出合计行", () => {
+    expect(pivot([]).data.rows).toEqual([]);
   });
 });
 

@@ -12,7 +12,8 @@ export function el<K extends keyof HTMLElementTagNameMap>(
   return n;
 }
 
-export function renderTable(host: HTMLElement, data: TableData, format?: Format): void {
+/** heat 与 data.rows 同形，0~1 决定底色深浅 */
+export function renderTable(host: HTMLElement, data: TableData, format?: Format, heat?: (number | null)[][]): void {
   const fmt = formatter(format);
   const cols = data.columns.map((c) => (typeof c === "string" ? { label: c, num: false } : { num: false, ...c }));
   const numeric = cols.map((c, i) => c.num || data.rows.some((r) => typeof r[i] === "number"));
@@ -20,11 +21,16 @@ export function renderTable(host: HTMLElement, data: TableData, format?: Format)
   const head = table.createTHead().insertRow();
   cols.forEach((c, i) => head.appendChild(el("th", numeric[i] ? "num" : "", c.label)));
   const body = table.createTBody();
-  for (const row of data.rows) {
+  data.rows.forEach((row, r) => {
     const tr = body.insertRow();
     row.forEach((cell, i) => {
       const td = tr.insertCell();
       if (numeric[i]) td.className = "num";
+      const h = heat?.[r]?.[i];
+      if (h != null) {
+        td.classList.add("eb-heat");
+        td.style.setProperty("--eb-heat", `${Math.round(h * 45)}%`);
+      }
       if (cell && typeof cell === "object") {
         td.textContent = cell.text;
         td.classList.add(`tone-${cell.tone}`);
@@ -32,7 +38,7 @@ export function renderTable(host: HTMLElement, data: TableData, format?: Format)
         td.textContent = typeof cell === "number" ? fmt(cell) : (cell ?? "—");
       }
     });
-  }
+  });
   host.appendChild(table);
 }
 

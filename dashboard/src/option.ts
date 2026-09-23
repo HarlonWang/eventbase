@@ -1,6 +1,6 @@
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatter, type Format } from "./format.js";
-import { mergeTail, sortByTotal } from "./source.js";
+import { finite, mergeTail, sortByTotal } from "./source.js";
 import type { Source } from "./types.js";
 
 const BASE: EChartsOption = {
@@ -99,14 +99,16 @@ export const heatmapHeight = (source: Source): number => Math.max(300, (source.l
 export function heatmapOption(source: Source, opts: { format?: Format; max?: number } = {}): EChartsOption {
   const fmt = formatter(opts.format);
   const [head = [], ...rows] = source;
-  const cells: (string | number)[][] = [];
+  const cells: [string, string, number][] = [];
   for (const r of rows) {
     head.slice(1).forEach((col, i) => {
-      const v = r[i + 1];
-      if (typeof v === "number") cells.push([String(col), String(r[0]), v]);
+      const v = finite(r[i + 1]);
+      if (v != null) cells.push([String(col), String(r[0]), v]);
     });
   }
-  const max = opts.max ?? Math.max(0, ...cells.map((c) => c[2] as number));
+  const values = cells.map((c) => c[2]);
+  const min = Math.min(0, ...values);
+  const max = opts.max ?? (values.length ? Math.max(...values) : 0);
   return {
     ...BASE,
     grid: { top: 56, bottom: 56 },
@@ -121,7 +123,7 @@ export function heatmapOption(source: Source, opts: { format?: Format; max?: num
     xAxis: { type: "category", position: "top", data: head.slice(1).map(String), splitArea: { show: true } },
     yAxis: { type: "category", inverse: true, data: rows.map((r) => String(r[0])), axisLabel: { formatter: dayLabel } },
     visualMap: {
-      min: 0, max, calculable: true, orient: "horizontal", left: "center", bottom: 0,
+      min, max, calculable: true, orient: "horizontal", left: "center", bottom: 0,
       formatter: (v: unknown) => fmt(v),
     },
     series: [{

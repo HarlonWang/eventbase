@@ -70,14 +70,27 @@ export interface TableCard extends CardBase {
 
 export interface HeatmapCard extends CardBase {
   type: "heatmap";
-  /** 首列行名（如队列日），表头为列名（如 D1、D7），格值为 null 时留空 */
+  /** 首列行名（如队列日），表头为列名（如 D1、D7），非数值格留空 */
   data: (results: Results, ctx: Ctx) => Source;
   /** 色阶上限，缺省取格值最大值 */
   max?: number;
   foot?: (data: Source, ctx: Ctx, results: Results) => Foot | Foot[] | undefined;
 }
 
-export type CardSpec = LineCard | BarCard | FunnelCard | HeatmapCard | TableCard;
+export interface MatrixCard extends CardBase {
+  type: "matrix";
+  /** 长表 [行名, 列名, 值]，由套件透视成二维表；同一格重复出现时累加 */
+  data: (results: Results, ctx: Ctx) => [string | number, string | number, unknown][];
+  /** 左上角表头，如「国家 / 渠道」 */
+  corner?: string;
+  /** 合计行与合计列，默认开；比率类数值不可加，应关掉 */
+  totals?: boolean;
+  /** 行列排序：total 按合计降序（默认），input 按首次出现顺序 */
+  order?: "total" | "input";
+  foot?: (data: TableData, ctx: Ctx, results: Results) => Foot | Foot[] | undefined;
+}
+
+export type CardSpec = LineCard | BarCard | FunnelCard | HeatmapCard | TableCard | MatrixCard;
 
 export interface KpiTile {
   label: string;
