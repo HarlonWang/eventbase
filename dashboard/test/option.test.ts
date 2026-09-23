@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatter } from "../src/format";
-import { barOption, funnelOption, lineOption, mergeTail } from "../src/option";
+import { barOption, funnelOption, lineOption } from "../src/option";
+import { mergeTail } from "../src/source";
 import type { Source } from "../src/types";
 
 const days: Source = [["day", "DAU", "新增"], ["2026-09-01", 3, 1], ["2026-09-02", null, 0]];
@@ -45,6 +46,10 @@ describe("mergeTail", () => {
     expect(mergeTail(src, 2)).toEqual([["name", "n"], ["b", 5], ["c", 3], ["其他（2）", 3]]);
   });
 
+  it("topN 为 0 时全部并入一行", () => {
+    expect(mergeTail(src, 0)).toEqual([["name", "n"], ["其他（4）", 11]]);
+  });
+
   it("行数不超过 N 时只排序不合并", () => {
     expect(mergeTail(src, 10)).toEqual([["name", "n"], ["b", 5], ["c", 3], ["d", 2], ["a", 1]]);
   });
@@ -59,6 +64,26 @@ describe("barOption", () => {
     expect(o.yAxis).toMatchObject({ type: "category", inverse: true });
     expect(o.series.map((s) => s.encode.x)).toEqual([1, 2]);
     expect(o.series[0].stack).toBe("total");
+  });
+});
+
+describe("barOption 排序", () => {
+  it("横向未设 topN 时也按数值降序", () => {
+    const o = barOption([["c", "n"], ["a", 1], ["b", 5]], { horizontal: true }) as { dataset: { source: Source } };
+    expect(o.dataset.source.map((r) => r[0])).toEqual(["c", "b", "a"]);
+  });
+
+  it("竖向保持原顺序（日期轴）", () => {
+    const src: Source = [["day", "n"], ["2026-09-01", 1], ["2026-09-02", 5]];
+    expect((barOption(src) as { dataset: { source: Source } }).dataset.source).toBe(src);
+  });
+});
+
+describe("x 轴日期标签", () => {
+  it("非日期类目原样显示，不抛错", () => {
+    const o = lineOption([["x", "v"], [1, 2]]) as { xAxis: { axisLabel: { formatter: (d: unknown) => string } } };
+    expect(o.xAxis.axisLabel.formatter(1)).toBe("1");
+    expect(o.xAxis.axisLabel.formatter("2026-09-01")).toBe("09-01");
   });
 });
 

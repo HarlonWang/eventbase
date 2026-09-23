@@ -42,7 +42,7 @@ function chartOption(spec: CardSpec, source: Source): EChartsOption {
 
 const optionOf = (o: Option) => (typeof o === "string" ? { value: o, label: o } : o);
 
-export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => Promise<void> } {
+export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => Promise<void>; destroy: () => void } {
   if (typeof echarts === "undefined") throw new Error("eventbase dashboard: 先用 <script> 加载 ECharts");
   injectStyle();
   const tz = spec.tzOffsetHours ?? 8;
@@ -81,13 +81,14 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   const ro = new ResizeObserver((entries) => {
     for (const e of entries) charts.get(e.target as HTMLElement)?.inst.resize();
   });
-  dark.addEventListener("change", () => {
+  const retheme = () => {
     for (const [node, c] of charts) {
       c.inst.dispose();
       c.inst = echarts.init(node, theme());
       c.inst.setOption(c.option);
     }
-  });
+  };
+  dark.addEventListener("change", retheme);
   const draw = (node: HTMLElement, option: EChartsOption) => {
     let c = charts.get(node);
     if (!c) {
@@ -200,19 +201,22 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
       }, (msg) => {
         v.error.textContent = `取数失败：${msg}`;
         v.error.hidden = false;
-        v.chart.hidden = v.table.hidden = v.empty.hidden = true;
+        v.chart.hidden = v.table.hidden = v.empty.hidden = v.foot.hidden = true;
       })),
       ...(spec.kpis ?? []).map((g, i) => guard(async () => {
         const results = await runAll(g.sql(ctx));
         if (my === seq) renderKpis(kpiHosts[i], g, results, ctx);
-      }, () => {})),
+      }, (msg) => {
+        kpiHosts[i].textContent = "";
+        kpiHosts[i].appendChild(el("div", "eb-box eb-error", `取数失败：${msg}`));
+      })),
     ];
     if (spec.freshness) {
       const f = spec.freshness;
       tasks.push(guard(async () => {
         const at = f.at(await runAll(f.sql));
         if (my === seq) fresh.textContent = at == null ? "" : `最新一条事件到库于 ${ago(at)}前`;
-      }, () => {}));
+      }, () => { fresh.textContent = ""; }));
     }
     await Promise.all(tasks);
     if (my !== seq) return;
@@ -266,5 +270,13 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   const stamp = bar.appendChild(el("span", "eb-muted eb-stamp"));
 
   void reload();
-  return { reload };
+  const destroy = () => {
+    seq++;
+    dark.removeEventListener("change", retheme);
+    ro.disconnect();
+    for (const c of charts.values()) c.inst.dispose();
+    charts.clear();
+    root.textContent = "";
+  };
+  return { reload, destroy };
 }

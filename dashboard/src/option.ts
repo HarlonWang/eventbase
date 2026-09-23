@@ -1,5 +1,6 @@
 import type { EChartsOption, SeriesOption } from "echarts";
 import { formatter, type Format } from "./format.js";
+import { mergeTail, sortByTotal } from "./source.js";
 import type { Source } from "./types.js";
 
 const BASE: EChartsOption = {
@@ -11,10 +12,9 @@ const BASE: EChartsOption = {
 /** 柱末端数值标签不在 outerBounds 的避让范围内，右侧要手动留白 */
 const LABEL_ROOM = 56;
 
-const seriesCount = (source: Source) => Math.max(0, (source[0]?.length ?? 1) - 1);
+const dayLabel = (d: unknown) => (typeof d === "string" && /^\d{4}-\d\d-\d\d$/.test(d) ? d.slice(5) : String(d));
 
-const rowTotal = (row: Source[number]) =>
-  row.slice(1).reduce<number>((a, v) => a + (typeof v === "number" ? v : 0), 0);
+const seriesCount = (source: Source) => Math.max(0, (source[0]?.length ?? 1) - 1);
 
 export function lineOption(source: Source, opts: { format?: Format; yMax?: number } = {}): EChartsOption {
   const fmt = formatter(opts.format);
@@ -24,21 +24,10 @@ export function lineOption(source: Source, opts: { format?: Format; yMax?: numbe
     legend: { show: n > 1 },
     tooltip: { trigger: "axis", valueFormatter: fmt },
     dataset: { source },
-    xAxis: { type: "category", axisLabel: { formatter: (d: string) => d.slice(5) } },
+    xAxis: { type: "category", axisLabel: { formatter: dayLabel } },
     yAxis: { type: "value", max: opts.yMax, axisLabel: { formatter: fmt } },
     series: Array.from({ length: n }, (): SeriesOption => ({ type: "line" })),
   };
-}
-
-/** 按行合计降序，保留前 topN 行，其余逐列求和并成一行 */
-export function mergeTail(source: Source, topN: number, otherLabel = "其他"): Source {
-  const [head, ...rows] = source;
-  const sorted = [...rows].sort((a, b) => rowTotal(b) - rowTotal(a));
-  if (sorted.length <= topN) return [head, ...sorted];
-  const tail = sorted.slice(topN);
-  const other = head.slice(1).map((_, i) =>
-    tail.reduce<number>((a, r) => a + (typeof r[i + 1] === "number" ? (r[i + 1] as number) : 0), 0));
-  return [head, ...sorted.slice(0, topN), [`${otherLabel}（${tail.length}）`, ...other]];
 }
 
 export function barOption(
@@ -47,7 +36,8 @@ export function barOption(
 ): EChartsOption {
   const fmt = formatter(opts.format);
   const n = seriesCount(source);
-  const data = opts.horizontal && opts.topN ? mergeTail(source, opts.topN, opts.otherLabel) : source;
+  const data = !opts.horizontal ? source
+    : opts.topN != null ? mergeTail(source, opts.topN, opts.otherLabel) : sortByTotal(source);
   const valueAxis = { type: "value" as const, axisLabel: { formatter: fmt } };
   const labelled = opts.horizontal && !opts.stack && n === 1;
   return {
@@ -58,7 +48,7 @@ export function barOption(
     dataset: { source: data },
     ...(opts.horizontal
       ? { xAxis: valueAxis, yAxis: { type: "category", inverse: true } }
-      : { xAxis: { type: "category", axisLabel: { formatter: (d: string) => (/^\d{4}-\d\d-\d\d$/.test(d) ? d.slice(5) : d) } }, yAxis: valueAxis }),
+      : { xAxis: { type: "category", axisLabel: { formatter: dayLabel } }, yAxis: valueAxis }),
     series: Array.from({ length: n }, (_, i): SeriesOption => ({
       type: "bar",
       stack: opts.stack ? "total" : undefined,
