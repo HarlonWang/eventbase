@@ -74,7 +74,7 @@ export interface HeatmapCard extends CardBase {
   data: (results: Results, ctx: Ctx) => Source;
   /** 色阶上限，缺省取格值最大值 */
   max?: number;
-  /** tooltip 里跟在行名后的补充说明，如队列人数；row 为 data() 首列原值 */
+  /** tooltip 里跟在行名后的补充说明，如队列人数；row 为 data() 首列转成的字符串（数字行名也是字符串） */
   rowHint?: (row: string, results: Results, ctx: Ctx) => string | undefined;
   foot?: (data: Source, ctx: Ctx, results: Results) => Foot | Foot[] | undefined;
 }

@@ -106,7 +106,7 @@ kpis: [
   horizontal?: boolean, stack?: boolean, topN?: number, otherLabel?: string,   // bar
   yMax?: number,                                           // line
   max?: number,                                            // heatmap：色阶上限，缺省取格值最大值
-  rowHint?: (row, results, ctx) => string,                 // heatmap：tooltip 行名后的补充，如队列人数
+  rowHint?: (row, results, ctx) => string,                 // heatmap：tooltip 行名后的补充，如队列人数；row 恒为字符串
   corner?: string, totals?: boolean, order?: "total" | "input",   // matrix
 }
 ```
