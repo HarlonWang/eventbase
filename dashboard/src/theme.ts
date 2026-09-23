@@ -32,3 +32,17 @@ export const isDark = (mode: ThemeMode, systemDark: boolean): boolean =>
 
 /** 写到 <html> 上，页面背景、表格、原生控件与图表一起切换 */
 export const colorScheme = (mode: ThemeMode): string => (mode === "auto" ? "light dark" : mode);
+
+let owners = 0;
+let original = "";
+
+/** <html> 是全局的：多个实例并存时，只在最后一个释放后还原挂载前的值 */
+export function claimScheme(scheme: string): void {
+  const html = document.documentElement;
+  if (owners++ === 0) original = html.style.colorScheme;
+  html.style.colorScheme = scheme;
+}
+
+export function releaseScheme(): void {
+  if (owners > 0 && --owners === 0) document.documentElement.style.colorScheme = original;
+}

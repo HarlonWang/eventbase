@@ -129,7 +129,7 @@ kpis: [
 - `aria.enabled: true`。
 - 每个图表容器挂 `ResizeObserver` → `chart.resize()`。
 - 刷新数据 `setOption(option, { notMerge: true })`。
-- 配色三档：页头「跟随系统 / 浅色 / 深色」，选择存 localStorage（读写失败退回跟随系统）；套件把 `color-scheme` 写到 `<html>`，页面背景与原生控件随之切换；图表切换时 `dispose()` 后以默认或 `dark` 主题重建。
+- 配色三档：页头「跟随系统 / 浅色 / 深色」，选择存 localStorage（读取失败默认跟随系统；写入失败只对本次页面生效）；套件把 `color-scheme` 写到 `<html>`，页面背景与原生控件随之切换；图表切换时 `dispose()` 后以默认或 `dark` 主题重建。
 
 ## 6. 运行时
 

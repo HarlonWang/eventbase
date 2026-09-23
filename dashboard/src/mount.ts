@@ -3,7 +3,7 @@ import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { formatter } from "./format.js";
 import { barOption, funnelOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
-import { colorScheme, isDark, loadMode, saveMode, THEME_MODES } from "./theme.js";
+import { claimScheme, colorScheme, isDark, loadMode, releaseScheme, saveMode, THEME_MODES } from "./theme.js";
 import { addDays, dayList, todayOf } from "./time.js";
 import type { CardSpec, Ctx, DashboardSpec, KpiGroup, Option, Results, Row, Source, TableData } from "./types.js";
 
@@ -96,8 +96,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   };
   dark.addEventListener("change", onSystemChange);
   const html = document.documentElement;
-  const prevScheme = html.style.colorScheme;
-  html.style.colorScheme = colorScheme(mode);
+  claimScheme(colorScheme(mode));
   for (const { mode: m, label } of THEME_MODES) {
     const b = themeGroup.appendChild(el("button", "", label));
     b.type = "button";
@@ -292,10 +291,13 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   const stamp = bar.appendChild(el("span", "eb-muted eb-stamp"));
 
   void reload();
+  let destroyed = false;
   const destroy = () => {
+    if (destroyed) return;
+    destroyed = true;
     seq++;
     dark.removeEventListener("change", onSystemChange);
-    html.style.colorScheme = prevScheme;
+    releaseScheme();
     ro.disconnect();
     for (const c of charts.values()) c.inst.dispose();
     charts.clear();
