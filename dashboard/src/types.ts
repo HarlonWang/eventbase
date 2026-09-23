@@ -135,4 +135,6 @@ export interface DashboardSpec {
   cards: CardSpec[];
   /** 日界时区，默认 8（与 eventbase 落库的 day 列一致） */
   tzOffsetHours?: number;
+  /** 卡片滚到视口附近才取数，默认开；false 时挂载即全部取数 */
+  lazy?: boolean;
 }
