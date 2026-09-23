@@ -29,12 +29,13 @@ export function compareText(
   label: string,
   format: Format = "int",
 ): { text: string; dir: "up" | "down" | null } {
+  const missing = (v: unknown) => v == null || (typeof v === "string" && v.trim() === "");
   const c = Number(cur), p = Number(prev);
-  if (cur == null || prev == null || !Number.isFinite(c) || !Number.isFinite(p) || p === 0) {
+  if (missing(cur) || missing(prev) || !Number.isFinite(c) || !Number.isFinite(p) || p === 0) {
     return { text: `— vs ${label}`, dir: null };
   }
   const tail = `vs ${label}（${formatter(format)(p)}）`;
   if (c === p) return { text: `持平 ${tail}`, dir: null };
-  const pct = Math.round((Math.abs(c - p) / p) * 1000) / 10;
+  const pct = Math.round((Math.abs(c - p) / Math.abs(p)) * 1000) / 10;
   return c > p ? { text: `↑ ${pct}% ${tail}`, dir: "up" } : { text: `↓ ${pct}% ${tail}`, dir: "down" };
 }

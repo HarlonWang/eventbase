@@ -164,4 +164,14 @@ describe("KPI 涨跌幅", () => {
     expect(compareText(5, 0, "x")).toEqual({ text: "— vs x", dir: null });
     expect(compareText(5, null, "x")).toEqual({ text: "— vs x", dir: null });
   });
+
+  it("空串按缺失处理，与 formatter 显示「—」一致", () => {
+    expect(compareText("", 25, "x")).toEqual({ text: "— vs x", dir: null });
+    expect(compareText(25, " ", "x")).toEqual({ text: "— vs x", dir: null });
+  });
+
+  it("对照值为负时百分比仍为正，方向看大小", () => {
+    expect(compareText(-20, -25, "x")).toEqual({ text: "↑ 20% vs x（-25）", dir: "up" });
+    expect(compareText(-30, -25, "x")).toEqual({ text: "↓ 20% vs x（-25）", dir: "down" });
+  });
 });
