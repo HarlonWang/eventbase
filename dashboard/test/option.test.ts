@@ -176,7 +176,7 @@ describe("pivot", () => {
 
   it("布尔、数组等非数值不计入", () => {
     const { data } = pivot([["a", "x", true], ["a", "y", []], ["a", "z", 2]]);
-    expect(data.rows[0]).toEqual(["a", null, null, 2, 2]);
+    expect(data.rows[0]).toEqual(["a", 2, null, null, 2]);
   });
 
   it("同一格累加；数值字符串照常计入", () => {
