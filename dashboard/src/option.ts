@@ -87,17 +87,20 @@ export function funnelOption(source: Source, opts: { format?: Format } = {}): EC
   };
 }
 
-const ROW_PX = 24;
-
 const escapeHtml = (v: unknown) =>
   String(v).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-/** 行数多时卡片随之加高，保证每格可读 */
-export const heatmapHeight = (source: Source): number => Math.max(300, (source.length - 1) * ROW_PX + 140);
+/** 色阶最深只到中等蓝，格内文字统一用深色：ECharts 自动反白会让同一张图黑白字混排 */
+const HEAT_COLORS = ["#eef1fb", "#8ea3e3"];
+const HEAT_TEXT = "#1f2329";
 
 /** 宽表转 heatmap 所需的 [列, 行, 值] 长表；null 不出格（D6：无数据不画成 0） */
-export function heatmapOption(source: Source, opts: { format?: Format; max?: number } = {}): EChartsOption {
+export function heatmapOption(
+  source: Source,
+  opts: { format?: Format; max?: number; rowHint?: (row: string) => string | undefined } = {},
+): EChartsOption {
   const fmt = formatter(opts.format);
+  const cellText = opts.format === "pct" ? (v: unknown) => `${Number(v).toFixed(1)}%` : fmt;
   const [head = [], ...rows] = source;
   const cells: [string, string, number][] = [];
   for (const r of rows) {
@@ -111,25 +114,25 @@ export function heatmapOption(source: Source, opts: { format?: Format; max?: num
   const max = opts.max ?? (values.length ? Math.max(...values) : 0);
   return {
     ...BASE,
-    grid: { top: 56, bottom: 56 },
+    grid: { top: 56, bottom: 8 },
     tooltip: {
       trigger: "item",
       formatter: (p: unknown) => {
         const { marker, value } = p as { marker: string; value: unknown[] };
-        return `${escapeHtml(value[1])}<br>${marker}${escapeHtml(value[0])}　<b>${escapeHtml(fmt(value[2]))}</b>`;
+        const row = String(value[1]);
+        const hint = opts.rowHint?.(row);
+        return `${escapeHtml(dayLabel(row))}${hint ? `　${escapeHtml(hint)}` : ""}`
+          + `<br>${marker}${escapeHtml(value[0])}　<b>${escapeHtml(cellText(value[2]))}</b>`;
       },
     },
     dataset: { source: [["x", "y", "v"], ...cells] },
-    xAxis: { type: "category", position: "top", data: head.slice(1).map(String), splitArea: { show: true } },
+    xAxis: { type: "category", position: "top", data: head.slice(1).map(String) },
     yAxis: { type: "category", inverse: true, data: rows.map((r) => String(r[0])), axisLabel: { formatter: dayLabel } },
-    visualMap: {
-      min, max, calculable: true, orient: "horizontal", left: "center", bottom: 0,
-      formatter: (v: unknown) => fmt(v),
-    },
+    visualMap: { show: false, min, max, inRange: { color: HEAT_COLORS } },
     series: [{
       type: "heatmap",
       encode: { x: 0, y: 1, value: 2 },
-      label: { show: true, formatter: (p: { value: unknown }) => fmt((p.value as unknown[])[2]) },
+      label: { show: true, color: HEAT_TEXT, formatter: (p: { value: unknown }) => cellText((p.value as unknown[])[2]) },
       labelLayout: { hideOverlap: true },
     }],
   };

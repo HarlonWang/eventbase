@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { compareText, formatter } from "../src/format";
-import { barOption, funnelOption, heatmapHeight, heatmapOption, lineOption } from "../src/option";
+import { barOption, funnelOption, heatmapOption, lineOption } from "../src/option";
 import { memoize } from "../src/fetch";
 import { mergeTail, pivot, type Triple } from "../src/source";
 import { colorScheme, currentMode, isDark, setMode, subscribeMode } from "../src/theme";
@@ -129,7 +129,7 @@ describe("heatmapOption", () => {
     const o = heatmapOption([["c", "D1"], ["<b>", 40]], { format: "pct" }) as {
       tooltip: { formatter: (p: unknown) => string };
     };
-    expect(o.tooltip.formatter({ marker: "•", value: ["D1", "<b>", 40] })).toBe("&#60;b&#62;<br>•D1　<b>40%</b>");
+    expect(o.tooltip.formatter({ marker: "•", value: ["D1", "<b>", 40] })).toBe("&#60;b&#62;<br>•D1　<b>40.0%</b>");
   });
 
   it("全为 null 时色阶上限为 0，不出 -Infinity", () => {
@@ -146,10 +146,27 @@ describe("heatmapOption", () => {
     expect(o.visualMap).toMatchObject({ min: -5, max: -2 });
   });
 
-  it("行多时加高，行少时不低于默认高度", () => {
-    expect(heatmapHeight(cohorts)).toBe(300);
-    const many: Source = [["c", "D1"], ...Array.from({ length: 30 }, (_, i) => [`r${i}`, i])];
-    expect(heatmapHeight(many)).toBe(30 * 24 + 140);
+  it("色阶条不显示、无分隔色带；格内文字统一深色", () => {
+    const o = heatmapOption(cohorts) as {
+      visualMap: { show: boolean }; xAxis: { splitArea?: unknown }; series: { label: { color: string } }[];
+    };
+    expect(o.visualMap.show).toBe(false);
+    expect(o.xAxis.splitArea).toBeUndefined();
+    expect(o.series[0].label.color).toMatch(/^#/);
+  });
+
+  it("pct 格内固定一位小数，列宽对齐", () => {
+    const o = heatmapOption(cohorts, { format: "pct" }) as { series: { label: { formatter: (p: { value: unknown }) => string } }[] };
+    expect(o.series[0].label.formatter({ value: ["D1", "a", 7] })).toBe("7.0%");
+    expect(o.series[0].label.formatter({ value: ["D1", "a", 7.25] })).toBe("7.3%");
+  });
+
+  it("rowHint 跟在 tooltip 行名后，同样转义", () => {
+    const o = heatmapOption(cohorts, { format: "pct", rowHint: (r) => (r === "2026-09-01" ? "队列 <12> 人" : undefined) }) as {
+      tooltip: { formatter: (p: unknown) => string };
+    };
+    expect(o.tooltip.formatter({ marker: "•", value: ["D1", "2026-09-01", 40] })).toBe("09-01　队列 &#60;12&#62; 人<br>•D1　<b>40.0%</b>");
+    expect(o.tooltip.formatter({ marker: "•", value: ["D1", "2026-09-02", 35.5] })).toBe("09-02<br>•D1　<b>35.5%</b>");
   });
 });
 
