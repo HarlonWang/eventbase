@@ -1,6 +1,6 @@
 # 看板套件设计
 
-> 状态：P1～P4 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
+> 状态：P1～P5 已实施（2026-09-23）。入口：`dashboard/src/index.ts`；最小示例：`dashboard/example.html`。
 
 ## 1. 定位
 
@@ -106,6 +106,7 @@ kpis: [
   horizontal?: boolean, stack?: boolean, topN?: number, otherLabel?: string,   // bar
   yMax?: number,                                           // line
   max?: number,                                            // heatmap：色阶上限，缺省取格值最大值
+  rowHint?: (row, results, ctx) => string,                 // heatmap：tooltip 行名后的补充，如队列人数
   corner?: string, totals?: boolean, order?: "total" | "input",   // matrix
 }
 ```
@@ -119,7 +120,7 @@ kpis: [
 | `line` | ECharts line，`tooltip.trigger: 'axis'` | 趋势：活跃与新增、会话时长、渗透率 |
 | `bar` | ECharts bar；`horizontal` 时按数值降序、`topN` 之外并为「其他」；`stack` 堆叠 | 构成随时间、类目分布、按类目的结果构成 |
 | `funnel` | `bar` 的预设：横向、按步骤顺序、标签「人数（占首步 %）」 | 登录 / 注册 / 订阅漏斗 |
-| `heatmap` | ECharts heatmap；`data()` 返回宽表（首列行名、表头列名），内部转长表；`null`、空串、非有限数值不出格（数值字符串照收），色阶 `visualMap` 置底；行多时卡片自动加高 | 队列留存（行 = 注册日、列 = D1/D7/D30） |
+| `heatmap` | ECharts heatmap；`data()` 返回宽表（首列行名、表头列名），内部转长表；`null`、空串、非有限数值不出格（数值字符串照收）；高度与其他图表一致，行多时格内数字自动隐藏；不显示色阶条（格内已有数字），色阶限于浅到中蓝、格内统一深色字；`pct` 固定一位小数 | 队列留存（行 = 安装日或安装周、列 = D1/D7/D30），队列人数放 `rowHint` |
 | `table` | DOM 表格，单元格可为 `{ text, tone: "bad" \| "dim" }`，超高内滚动 | 队列留存、明细、排行、多组对比 |
 | `matrix` | `table` 的预设：`data()` 返回长表 `[行, 列, 值]`，套件透视成二维表；同格累加、缺失留「—」；默认按合计降序并带合计行列（比率类关掉 `totals`）；格子按数值深浅着色 | 国家 × 渠道、平台 × 版本 |
 | KPI | DOM | §4.3 |
@@ -157,7 +158,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.11.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.12.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -173,5 +174,6 @@ dashboard/
 | P2 ✅ | 配色三档切换（0.8.0）、同批次 SQL 去重（0.9.0）；私有消费方迁移并部署 | 同上 |
 | P3 ✅ | KPI 对比昨日同时段（0.10.0） | 同上 |
 | P4 ✅ | 热力图、矩阵表（0.11.0） | 同上 |
+| P5 ✅ | 热力图等高、去色阶条与色带、`rowHint`（0.12.0） | 同上 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。
