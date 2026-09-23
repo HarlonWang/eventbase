@@ -209,7 +209,7 @@ migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移
 
 ## 6. 仓库与依赖关系
 
-### 6.1 六个产物、三种角色
+### 6.1 七个产物、三种角色
 
 | 角色 | 仓库 | 产物 | 是否部署 |
 |---|---|---|---|
@@ -217,6 +217,7 @@ migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移
 | | `loginbase-kt` | Maven `wang.harlon:loginbase-kt` | ❌ |
 | | 埋点服务端仓（新） | npm 包 + **协议文档唯一权威** | ❌ |
 | | 埋点 KMP 仓（新） | Maven 客户端库 | ❌ |
+| **看板**（跑在浏览器里） | 埋点服务端仓 `dashboard/` | 随 npm 包分发的 ESM，jsDelivr 直接引用（见 `dashboard.md`） | ❌ |
 | **部署方** | 业务 Worker 仓（私有） | 业务 Worker（含 `/t/*` 摄取挂载）+ 两个 D1 | ✅ 唯一部署处 |
 | **客户端** | `TrendingAI` | App | ✅ 发版 |
 

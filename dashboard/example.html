@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>eventbase dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
+</head>
+<body>
+<div id="app"></div>
+<script type="module">
+import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.7.0/dist/dashboard/index.js";
+
+const CLIENT = (ctx) => `source='client' AND is_debug=0 AND day BETWEEN '${ctx.from}' AND '${ctx.to}'`
+  + (ctx.state.platform ? ` AND platform='${ctx.esc(ctx.state.platform)}'` : "");
+
+mount(document.getElementById("app"), {
+  api: { base: "https://your-worker.example.com/t/q", token: "<EVENTBASE_ADMIN_TOKEN>" },
+  title: "埋点看板",
+  filters: {
+    ranges: { options: [7, 14, 30], default: 14 },
+    selects: [{ key: "platform", label: "全部平台", options: ["android", "ios"] }],
+  },
+  kpis: [{
+    sql: (ctx) => `SELECT COUNT(DISTINCT install_id) v FROM events WHERE source='client' AND day='${ctx.today}'`,
+    tiles: ([[r]]) => [{ label: "DAU（今日实时）", value: r?.v }],
+  }],
+  cards: [
+    {
+      type: "line", title: "DAU",
+      sql: (ctx) => `SELECT day, COUNT(DISTINCT install_id) v FROM events WHERE ${CLIENT(ctx)} GROUP BY day`,
+      data: ([rows], ctx) => {
+        const at = Object.fromEntries(rows.map((r) => [r.day, r.v]));
+        return [["day", "DAU"], ...ctx.days.map((d) => [d, at[d] ?? 0])];
+      },
+    },
+    {
+      type: "bar", horizontal: true, topN: 8, title: "事件分布",
+      sql: (ctx) => `SELECT name, COUNT(*) n FROM events WHERE ${CLIENT(ctx)} GROUP BY name`,
+      data: ([rows]) => [["事件", "条数"], ...rows.map((r) => [r.name, r.n])],
+    },
+  ],
+});
+</script>
+</body>
+</html>

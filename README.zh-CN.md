@@ -21,6 +21,7 @@ eventbase 挂进你已经在跑的 Worker。事件落在**你自己的** D1 里�
 - **丢失可归因。** 拒绝与丢弃按天按原因记进 `ingest_drops`，配合客户端的诊断日志，能把一条缺失的事件归因到三者之一：没 track、传丢了、服务端拒了。
 - **你的 D1，你的数据。** 表结构随包分发，`migrations_dir` 指过去就行。什么都不出你的 Cloudflare 账号，也没有第三方替你保管用户行为。
 - **服务端也能写事件。** `createTracker` 在你的 Worker 里写入，于是客户端观测不到的时刻——配额拦截、成单——落进同一张表，靠 `flow_id` 与客户端事件合流。
+- **一个现成的浏览器看板。** `@whlong/eventbase/dashboard` 把取数面接成一个单文件 HTML 看板：你写筛选、卡片和每张卡的 SQL，ECharts 负责画，不需要构建，见[看板套件](docs/dashboard.md)。
 - **一个替你处理难点的客户端。** [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) 负责离线队列、批量、退避重试与生命周期事件，且**不采集任何设备标识符**。
 
 ## 快速开始
@@ -118,6 +119,7 @@ Cloudflare Workers，带 D1 binding · `hono` ^4.12.8 · 一个会说[上报协�
 | [上报协议](docs/protocol.md) | wire 契约——两端的唯一权威 |
 | [埋点设计](docs/telemetry-design.md) | 命名规范、指标口径、四层模型 |
 | [设计决策](docs/design.md) | 部署拓扑、接入形态、为什么拆两个仓 |
+| [看板套件](docs/dashboard.md) | 浏览器端看板：写一份规格（筛选、卡片、SQL），ECharts 渲染 |
 
 ## License
 

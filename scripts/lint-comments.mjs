@@ -3,7 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const THRESHOLD = 0.15;
-const ROOTS = ["src", "test"];
+const ROOTS = ["src", "test", "dashboard/src", "dashboard/test"];
 
 function files(dir) {
   let out = [];

@@ -1,6 +1,6 @@
 {
   "name": "@whlong/eventbase",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Self-hosted app analytics on Cloudflare Workers + D1: batched ingestion, typed query endpoint, as a Hono sub-app factory.",
   "type": "module",
   "license": "MIT",
@@ -23,6 +23,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./dashboard": {
+      "types": "./dist/dashboard/index.d.ts",
+      "import": "./dist/dashboard/index.js"
     }
   },
   "files": [
@@ -35,8 +39,8 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json && tsc -p dashboard/tsconfig.build.json",
+    "typecheck": "tsc --noEmit && tsc -p dashboard/tsconfig.json",
     "test": "vitest run",
     "lint:comments": "node scripts/lint-comments.mjs",
     "prepublishOnly": "npm run typecheck && npm run build && npm test"
@@ -47,6 +51,7 @@
   "devDependencies": {
     "@cloudflare/vitest-pool-workers": "~0.13.1",
     "@cloudflare/workers-types": "~4.20260317.1",
+    "echarts": "6.1.0",
     "hono": "^4.12.8",
     "typescript": "^5.9.3",
     "vitest": "^4.1.0",
