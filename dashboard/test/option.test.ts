@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatter } from "../src/format";
+import { compareText, formatter } from "../src/format";
 import { barOption, funnelOption, lineOption } from "../src/option";
 import { memoize } from "../src/fetch";
 import { mergeTail } from "../src/source";
@@ -149,5 +149,29 @@ describe("同批次 SQL 去重", () => {
     a.sort((x, y) => Number(x.n) - Number(y.n));
     expect(b.map((r) => r.n)).toEqual([2, 1]);
     expect(c).toHaveLength(2);
+  });
+});
+
+describe("KPI 涨跌幅", () => {
+  it("涨跌带方向、一位小数与对照绝对值", () => {
+    expect(compareText(21, 25, "昨日同时段")).toEqual({ text: "↓ 16% vs 昨日同时段（25）", dir: "down" });
+    expect(compareText(30, 25, "昨日同时段")).toEqual({ text: "↑ 20% vs 昨日同时段（25）", dir: "up" });
+    expect(compareText(1234, 1000, "x").text).toBe("↑ 23.4% vs x（1,000）");
+  });
+
+  it("持平不上色；对照为 0 或缺失只给 —", () => {
+    expect(compareText(25, 25, "x")).toEqual({ text: "持平 vs x（25）", dir: null });
+    expect(compareText(5, 0, "x")).toEqual({ text: "— vs x", dir: null });
+    expect(compareText(5, null, "x")).toEqual({ text: "— vs x", dir: null });
+  });
+
+  it("空串按缺失处理，与 formatter 显示「—」一致", () => {
+    expect(compareText("", 25, "x")).toEqual({ text: "— vs x", dir: null });
+    expect(compareText(25, " ", "x")).toEqual({ text: "— vs x", dir: null });
+  });
+
+  it("对照值为负时百分比仍为正，方向看大小", () => {
+    expect(compareText(-20, -25, "x")).toEqual({ text: "↑ 20% vs x（-25）", dir: "up" });
+    expect(compareText(-30, -25, "x")).toEqual({ text: "↓ 20% vs x（-25）", dir: "down" });
   });
 });

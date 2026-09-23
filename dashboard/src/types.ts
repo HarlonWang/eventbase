@@ -75,6 +75,8 @@ export interface KpiTile {
   value: unknown;
   format?: Format;
   hint?: string;
+  /** 与对照值比较，渲染「↑ 12.3% vs 昨日同时段（25）」；仅 big 布局显示 */
+  compare?: { value: unknown; label: string };
 }
 
 export interface KpiGroup {
