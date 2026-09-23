@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { formatter } from "../src/format";
 import { barOption, funnelOption, lineOption } from "../src/option";
+import { memoize } from "../src/fetch";
 import { mergeTail } from "../src/source";
 import { colorScheme, currentMode, isDark, setMode, subscribeMode } from "../src/theme";
 import type { Source } from "../src/types";
@@ -133,5 +134,20 @@ describe("配色是页面级共享状态", () => {
     offA();
     expect(html.style.colorScheme).toBe("normal");
     delete (globalThis as { document?: unknown }).document;
+  });
+});
+
+describe("同批次 SQL 去重", () => {
+  it("文本相同只请求一次，各调用方拿到独立的数组", async () => {
+    const calls: string[] = [];
+    const run = memoize(async (sql) => {
+      calls.push(sql);
+      return [{ n: 2 }, { n: 1 }];
+    });
+    const [a, b, c] = await Promise.all([run("SELECT 1"), run("SELECT 1"), run("SELECT 2")]);
+    expect(calls).toEqual(["SELECT 1", "SELECT 2"]);
+    a.sort((x, y) => Number(x.n) - Number(y.n));
+    expect(b.map((r) => r.n)).toEqual([2, 1]);
+    expect(c).toHaveLength(2);
   });
 });
