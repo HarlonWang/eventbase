@@ -3,6 +3,7 @@ import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { formatter } from "./format.js";
 import { barOption, funnelOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
+import { colorScheme, isDark, loadMode, saveMode, THEME_MODES } from "./theme.js";
 import { addDays, dayList, todayOf } from "./time.js";
 import type { CardSpec, Ctx, DashboardSpec, KpiGroup, Option, Results, Row, Source, TableData } from "./types.js";
 
@@ -59,10 +60,11 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   head.appendChild(el("h1", "", spec.title));
   if (spec.subtitle) head.appendChild(el("span", "eb-muted", spec.subtitle));
   const fresh = head.appendChild(el("span", "eb-muted"));
-  if (spec.links?.length) {
-    const links = head.appendChild(el("nav", "eb-links"));
-    for (const l of spec.links) Object.assign(links.appendChild(el("a", "", l.text)), { href: l.href });
-  }
+  const tools = head.appendChild(el("div", "eb-tools"));
+  for (const l of spec.links ?? []) Object.assign(tools.appendChild(el("a", "", l.text)), { href: l.href });
+  const themeGroup = tools.appendChild(el("div"));
+  themeGroup.setAttribute("role", "group");
+  themeGroup.setAttribute("aria-label", "配色");
   if (spec.guide) {
     const d = root.appendChild(el("details", "eb-guide eb-box"));
     d.appendChild(el("summary", "", spec.guide.summary));
@@ -77,7 +79,8 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
 
   const charts = new Map<HTMLElement, { inst: ECharts; option: EChartsOption }>();
   const dark = matchMedia("(prefers-color-scheme: dark)");
-  const theme = () => (dark.matches ? "dark" : undefined);
+  let mode = loadMode();
+  const theme = () => (isDark(mode, dark.matches) ? "dark" : undefined);
   const ro = new ResizeObserver((entries) => {
     for (const e of entries) charts.get(e.target as HTMLElement)?.inst.resize();
   });
@@ -88,7 +91,26 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
       c.inst.setOption(c.option);
     }
   };
-  dark.addEventListener("change", retheme);
+  const onSystemChange = () => {
+    if (mode === "auto") retheme();
+  };
+  dark.addEventListener("change", onSystemChange);
+  const html = document.documentElement;
+  const prevScheme = html.style.colorScheme;
+  html.style.colorScheme = colorScheme(mode);
+  for (const { mode: m, label } of THEME_MODES) {
+    const b = themeGroup.appendChild(el("button", "", label));
+    b.type = "button";
+    b.setAttribute("aria-pressed", String(m === mode));
+    b.addEventListener("click", () => {
+      if (m === mode) return;
+      mode = m;
+      saveMode(m);
+      html.style.colorScheme = colorScheme(m);
+      for (const x of themeGroup.children) x.setAttribute("aria-pressed", String(x === b));
+      retheme();
+    });
+  }
   const draw = (node: HTMLElement, option: EChartsOption) => {
     let c = charts.get(node);
     if (!c) {
@@ -272,7 +294,8 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   void reload();
   const destroy = () => {
     seq++;
-    dark.removeEventListener("change", retheme);
+    dark.removeEventListener("change", onSystemChange);
+    html.style.colorScheme = prevScheme;
     ro.disconnect();
     for (const c of charts.values()) c.inst.dispose();
     charts.clear();
