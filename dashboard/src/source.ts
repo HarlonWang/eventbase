@@ -28,9 +28,9 @@ export interface Pivot {
   heat: (number | null)[][];
 }
 
-/** 数值与数值字符串转成有限数；null、空串、NaN、±Infinity 视为无数据 */
+/** 数值与数值字符串转成有限数；其余类型、空串、NaN、±Infinity 视为无数据 */
 export const finite = (v: unknown): number | null => {
-  if (v == null || (typeof v === "string" && v.trim() === "")) return null;
+  if (typeof v !== "number" && (typeof v !== "string" || v.trim() === "")) return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };

@@ -174,6 +174,11 @@ describe("pivot", () => {
     expect(heat[3].every((h) => h === null)).toBe(true);
   });
 
+  it("布尔、数组等非数值不计入", () => {
+    const { data } = pivot([["a", "x", true], ["a", "y", []], ["a", "z", 2]]);
+    expect(data.rows[0]).toEqual(["a", null, null, 2, 2]);
+  });
+
   it("同一格累加；数值字符串照常计入", () => {
     const { data } = pivot([["a", "x", 1], ["a", "x", "2"]], { totals: false });
     expect(data.rows).toEqual([["a", 3]]);
