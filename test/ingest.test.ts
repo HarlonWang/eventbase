@@ -458,3 +458,26 @@ describe("user 假名化", () => {
     expect(row.user_id).toBe("identity-1");
   });
 });
+
+describe("存储故障", () => {
+  const d1Down = (where: "read" | "write"): D1Database => {
+    const fail = async () => {
+      throw new Error("D1_ERROR: exceeded D1's free tier daily row read limit [code: 7500]");
+    };
+    const stmt = { bind: () => stmt, first: fail, all: fail, run: fail } as unknown as D1PreparedStatement;
+    return {
+      prepare: (sql: string) => (where === "write" && /^\s*SELECT/i.test(sql) ? env.DB.prepare(sql) : stmt),
+      batch: fail,
+    } as unknown as D1Database;
+  };
+
+  it("配额预读失败回 5xx，客户端留队列重试，不能吞成 204", async () => {
+    const app = ingest({ db: () => d1Down("read"), quotas: { perInstallPerDay: 2000, totalPerDay: 500_000 } });
+    expect((await post(app, batch())).status).toBeGreaterThanOrEqual(500);
+  });
+
+  it("写入失败回 5xx", async () => {
+    const app = ingest({ db: () => d1Down("write") });
+    expect((await post(app, batch())).status).toBeGreaterThanOrEqual(500);
+  });
+});

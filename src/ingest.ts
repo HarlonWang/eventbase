@@ -11,6 +11,7 @@ import type { NormalizedEvent } from "./validate.js";
 /**
  * 摄取端。**成功路径恒 204**，不区分「已入库」与「已丢弃」——客户端收到 204 即出队，
  * 不重试。4xx 同样出队（服务端已判定无效），只有 5xx 与网络错误才该重试。
+ * 存储故障不得吞成 204：D1 抛错须冒泡为 5xx，客户端才会留队列补报（「吞一切异常」只适用 tracker）。
  */
 export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
   const app = new Hono<{ Bindings: TEnv }>().basePath(config.basePath ?? "");
