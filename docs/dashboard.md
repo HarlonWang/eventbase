@@ -135,6 +135,8 @@ kpis: [
 
 筛选变化 → 所有卡片 SQL 并发 → 过期响应丢弃（序号比对）→ 各卡独立渲染。
 
+同一次刷新内 SQL 文本相同只请求一次（多张卡共用一个聚合查询时不重复打 D1），各卡拿到各自的数组副本。加载中的卡片与 KPI 变淡，避免旧读数被当成新结果。
+
 ## 7. 工程
 
 ```
@@ -150,7 +152,7 @@ dashboard/
 ```html
 <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 <script type="module">
-  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.8.0/dist/dashboard/index.js";
+  import { mount } from "https://cdn.jsdelivr.net/npm/@whlong/eventbase@0.9.0/dist/dashboard/index.js";
   mount(document.getElementById("app"), { /* 规格 */ });
 </script>
 ```
@@ -163,6 +165,6 @@ dashboard/
 | 阶段 | 内容 | 验收 |
 |---|---|---|
 | P1 ✅ | 套件核心 + 五种组件；TrendingAI 全部卡片按新形态迁完 | 同一套 SQL 下新旧数字一致；拖动窗口宽度不失真；深浅色切换正常；控制台无报错 |
-| P2 | 配色三档切换（0.8.0）；私有消费方迁移并部署 | 同上 |
+| P2 | 配色三档切换（0.8.0）、同批次 SQL 去重（0.9.0）；私有消费方迁移并部署 | 同上 |
 
 **待办**（逐项评估后再加）：样本量提示、版本发布标注、留存热力图、矩阵表（如国家 × 渠道）、多组漏斗共用基准、卡片视图切换（榜 ↔ 趋势）。

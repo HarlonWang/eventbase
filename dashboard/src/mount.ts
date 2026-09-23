@@ -1,5 +1,6 @@
 import type { ECharts, EChartsOption } from "echarts";
 import { ago, el, renderFoot, renderTable } from "./dom.js";
+import { memoize } from "./fetch.js";
 import { formatter } from "./format.js";
 import { barOption, funnelOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
@@ -52,7 +53,10 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   for (const s of filters.selects ?? []) state[s.key] = "";
   for (const t of filters.toggles ?? []) state[t.key] = t.default ?? false;
   let range = filters.ranges?.default ?? 14;
-  const runAll = (q: string | string[]): Promise<Results> => Promise.all([q].flat().map((s) => runSql(spec.api, s)));
+  const batch = () => {
+    const run = memoize((s) => runSql(spec.api, s));
+    return (q: string | string[]): Promise<Results> => Promise.all([q].flat().map(run));
+  };
 
   root.classList.add("eb");
   root.textContent = "";
@@ -197,6 +201,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
   async function reload(): Promise<void> {
     const my = ++seq;
     const ctx = ctxNow();
+    const runAll = batch();
     for (const v of cards) {
       const n = v.spec.note;
       v.note.textContent = typeof n === "function" ? n(ctx) : (n ?? "");
@@ -225,6 +230,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
         v.chart.hidden = v.table.hidden = v.empty.hidden = v.foot.hidden = true;
       })),
       ...(spec.kpis ?? []).map((g, i) => guard(async () => {
+        for (const box of kpiHosts[i].children) box.classList.add("eb-loading");
         const results = await runAll(g.sql(ctx));
         if (my === seq) renderKpis(kpiHosts[i], g, results, ctx);
       }, (msg) => {
