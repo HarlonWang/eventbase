@@ -3,7 +3,7 @@ import { ago, el, renderFoot, renderTable } from "./dom.js";
 import { formatter } from "./format.js";
 import { barOption, funnelOption, lineOption } from "./option.js";
 import { injectStyle } from "./style.js";
-import { claimScheme, colorScheme, isDark, loadMode, releaseScheme, saveMode, THEME_MODES } from "./theme.js";
+import { currentMode, isDark, setMode, subscribeMode, THEME_MODES } from "./theme.js";
 import { addDays, dayList, todayOf } from "./time.js";
 import type { CardSpec, Ctx, DashboardSpec, KpiGroup, Option, Results, Row, Source, TableData } from "./types.js";
 
@@ -79,8 +79,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
 
   const charts = new Map<HTMLElement, { inst: ECharts; option: EChartsOption }>();
   const dark = matchMedia("(prefers-color-scheme: dark)");
-  let mode = loadMode();
-  const theme = () => (isDark(mode, dark.matches) ? "dark" : undefined);
+  const theme = () => (isDark(currentMode(), dark.matches) ? "dark" : undefined);
   const ro = new ResizeObserver((entries) => {
     for (const e of entries) charts.get(e.target as HTMLElement)?.inst.resize();
   });
@@ -92,24 +91,25 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     }
   };
   const onSystemChange = () => {
-    if (mode === "auto") retheme();
+    if (currentMode() === "auto") retheme();
   };
   dark.addEventListener("change", onSystemChange);
-  const html = document.documentElement;
-  claimScheme(colorScheme(mode));
-  for (const { mode: m, label } of THEME_MODES) {
+  const buttons = THEME_MODES.map(({ mode, label }) => {
     const b = themeGroup.appendChild(el("button", "", label));
     b.type = "button";
-    b.setAttribute("aria-pressed", String(m === mode));
     b.addEventListener("click", () => {
-      if (m === mode) return;
-      mode = m;
-      saveMode(m);
-      html.style.colorScheme = colorScheme(m);
-      for (const x of themeGroup.children) x.setAttribute("aria-pressed", String(x === b));
-      retheme();
+      if (mode !== currentMode()) setMode(mode);
     });
-  }
+    return { mode, b };
+  });
+  const syncTheme = () => {
+    for (const { mode, b } of buttons) b.setAttribute("aria-pressed", String(mode === currentMode()));
+  };
+  syncTheme();
+  const unsubscribe = subscribeMode(() => {
+    syncTheme();
+    retheme();
+  });
   const draw = (node: HTMLElement, option: EChartsOption) => {
     let c = charts.get(node);
     if (!c) {
@@ -297,7 +297,7 @@ export function mount(root: HTMLElement, spec: DashboardSpec): { reload: () => P
     destroyed = true;
     seq++;
     dark.removeEventListener("change", onSystemChange);
-    releaseScheme();
+    unsubscribe();
     ro.disconnect();
     for (const c of charts.values()) c.inst.dispose();
     charts.clear();
