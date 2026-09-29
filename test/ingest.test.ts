@@ -165,6 +165,25 @@ describe("批级拒绝", () => {
     expect(res.status).toBe(413);
   });
 
+  it("limits 放开 body 与 props 串值上限", async () => {
+    const long = "x".repeat(40_000);
+    const res = await post(
+      ingest({ limits: { bodyBytes: 1024 * 1024, propValueChars: 32_768 } }),
+      batch({ events: [{ name: "app_opened", at: Date.now(), props: { long, pad: "y".repeat(80_000) } }] })
+    );
+    expect(res.status).toBe(204);
+    const parsed = JSON.parse((await rows())[0].props!) as Record<string, unknown>;
+    expect((parsed.long as string).length).toBe(32_768);
+  });
+
+  it("limits 只给一项时，另一项沿用默认值", async () => {
+    const res = await post(
+      ingest({ limits: { propValueChars: 32_768 } }),
+      batch({ events: [{ name: "app_opened", props: { pad: "x".repeat(70_000) } }] })
+    );
+    expect(res.status).toBe(413);
+  });
+
   it("缺 install 或 session 一律 400", async () => {
     expect((await post(ingest(), batch({ install: undefined }))).status).toBe(400);
     expect((await post(ingest(), batch({ session: undefined }))).status).toBe(400);

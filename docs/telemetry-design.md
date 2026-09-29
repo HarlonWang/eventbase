@@ -187,9 +187,9 @@ CREATE TABLE dim_identity_daily (
 | 约束 | 值 | 依据 |
 |---|---|---|
 | 单批事件数 | ≤ 25 | 照 Aptabase |
-| body 体积 | ≤ 64 KB | |
+| body 体积 | ≤ 64 KB | 默认值，部署方可配（`limits`） |
 | 事件名 | ≤ 60 字符 | 照 Aptabase |
-| props 键数 / 键长 / 串值 | ≤ 20 / ≤ 40 字符 / 截断 180 | 治基数爆炸 |
+| props 键数 / 键长 / 串值 | ≤ 20 / ≤ 40 字符 / 截断 180 | 治基数爆炸；串值上限部署方可配（`limits`） |
 | 时间戳 | 未来 > 10 分钟拒；早于 7 天拒 | 防灌历史数据；窗口刻意比 Aptabase 的 24 小时宽，理由见本文「过期窗口」 |
 | 限流 | `limiter.limit({key: install_id})` 60s 窗口，兜底再按 IP 限一层 | Workers 原生绑定，按 colo 局部 |
 | 日配额 | per install + 全局，D1 计数，超了直接丢 | 跨 colo 需汇总，限流绑定做不到 |
