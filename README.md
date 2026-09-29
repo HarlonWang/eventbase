@@ -57,6 +57,7 @@ const ingest = createIngest<Env>({
   basePath: "/t",                                  // ingestion lands on /t/e
   appKeys: (env) => [env.EVENTBASE_KEY],           // public key: routing and kill-switch, not auth
   identitySecret: (env) => env.EVENTBASE_IDENTITY_SECRET, // user lands as an HMAC pseudonym; raw identity ids never reach D1
+  limits: { bodyBytes: 1024 * 1024, propValueChars: 32_768 }, // optional: raise the 64 KB body / 180-char prop value defaults
 });
 
 const query = createQuery<Env>({

@@ -88,7 +88,8 @@ export function parseBatch(raw: unknown): IncomingBatch | BatchError {
 export function normalizeEvent(
   event: IncomingEvent,
   now: number,
-  allowed?: readonly string[]
+  allowed?: readonly string[],
+  propValueChars: number = LIMITS.propValueChars
 ): NormalizedEvent | DropReason {
   if (!isRecord(event)) return "invalid";
   const name = str(event.name);
@@ -104,11 +105,11 @@ export function normalizeEvent(
     name,
     at,
     flow: str(event.flow) ?? null,
-    props: normalizeProps(event.props),
+    props: normalizeProps(event.props, propValueChars),
   };
 }
 
-function normalizeProps(raw: unknown): string | null {
+function normalizeProps(raw: unknown, propValueChars: number): string | null {
   if (!isRecord(raw)) return null;
 
   const out: Record<string, string | number | boolean> = {};
@@ -116,7 +117,7 @@ function normalizeProps(raw: unknown): string | null {
   for (const [key, value] of Object.entries(raw)) {
     if (keys >= LIMITS.propKeys) break;
     if (!key || key.length > LIMITS.propKeyChars) continue;
-    if (typeof value === "string") out[key] = value.slice(0, LIMITS.propValueChars);
+    if (typeof value === "string") out[key] = value.slice(0, propValueChars);
     else if (typeof value === "number" && Number.isFinite(value)) out[key] = value;
     else if (typeof value === "boolean") out[key] = value;
     else continue;

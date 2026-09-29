@@ -19,4 +19,6 @@ export interface IngestConfig<TEnv> {
   quotas?: Quotas;
   /** 配置后 `user` 以 HMAC 假名落库（events.user_id 与 install_identity 同时生效），原值不进 D1；返回空串视为配置错误、user 丢弃；`device` 不处理 */
   identitySecret?: (env: TEnv) => string | undefined;
+  /** 覆盖 `LIMITS` 的体积上限，未给的项沿用默认值 */
+  limits?: { bodyBytes?: number; propValueChars?: number };
 }

@@ -15,6 +15,8 @@ import type { NormalizedEvent } from "./validate.js";
  */
 export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
   const app = new Hono<{ Bindings: TEnv }>().basePath(config.basePath ?? "");
+  const bodyBytes = config.limits?.bodyBytes ?? LIMITS.bodyBytes;
+  const propValueChars = config.limits?.propValueChars ?? LIMITS.propValueChars;
 
   app.post("/e", async (c) => {
     const env = c.env as TEnv;
@@ -25,7 +27,7 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
     }
 
     const body = await c.req.text();
-    if (new TextEncoder().encode(body).length > LIMITS.bodyBytes) {
+    if (new TextEncoder().encode(body).length > bodyBytes) {
       return c.json({ error: "body too large" }, 413);
     }
 
@@ -58,7 +60,7 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
     const events: NormalizedEvent[] = [];
     const drops = new Map<string, number>();
     for (const raw of batch.events) {
-      const normalized = normalizeEvent(raw, now, config.allowedEvents);
+      const normalized = normalizeEvent(raw, now, config.allowedEvents, propValueChars);
       if (typeof normalized === "string") drops.set(normalized, (drops.get(normalized) ?? 0) + 1);
       else events.push(normalized);
     }

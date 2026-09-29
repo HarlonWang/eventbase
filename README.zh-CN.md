@@ -57,6 +57,7 @@ const ingest = createIngest<Env>({
   basePath: "/t",                                  // 摄取端点落在 /t/e
   appKeys: (env) => [env.EVENTBASE_KEY],           // 公开 key：用于路由与关停，不是鉴权
   identitySecret: (env) => env.EVENTBASE_IDENTITY_SECRET, // user 以 HMAC 假名落库，原始身份 id 不进 D1
+  limits: { bodyBytes: 1024 * 1024, propValueChars: 32_768 }, // 可选：放开 body 64 KB / props 串值 180 字符的默认上限
 });
 
 const query = createQuery<Env>({
