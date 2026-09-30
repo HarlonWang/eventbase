@@ -66,7 +66,7 @@ S1~S10 由另一个会话自主修复（2026-08-19，43 测试通过）。S5/S7 
 
 CTE 影子名（`WITH sqlite_master AS (...) SELECT * FROM sqlite_master`）实测返回 CTE 自身的行，SQLite 里 CTE 优先于真实表，不构成绕过。
 
-## 客户端 eventbase-kt（23 条）
+## 客户端 eventbase-kmp（23 条）
 
 **23 条已全部关闭**（2026-08-19）：K1~K9、K11、K12、K15~K17、K19、K23 由 PR #2 修复；K10、K13、K14、K18、K20~K22 由 PR #3 修复。
 
@@ -111,7 +111,7 @@ PR #2 与 PR #3 各自又被 CodeRabbit 与本地 `/code-review` 审出新问题
 
 ## 处理计划
 
-1. ~~两个仓加 `.coderabbit.yaml`~~ → 本仓已加。**官方 schema 表达不了「仅导出符号」**：`reviews.pre_merge_checks.docstrings` 只有 `mode` / `threshold` 两个字段。故改为 `mode: "off"` 关掉覆盖率门禁，把注释准入写进 `path_instructions`（导出符号要 TSDoc、内部实现豁免、复述性注释反过来提删除）。eventbase-kt 照抄同一份即可；
+1. ~~两个仓加 `.coderabbit.yaml`~~ → 本仓已加。**官方 schema 表达不了「仅导出符号」**：`reviews.pre_merge_checks.docstrings` 只有 `mode` / `threshold` 两个字段。故改为 `mode: "off"` 关掉覆盖率门禁，把注释准入写进 `path_instructions`（导出符号要 TSDoc、内部实现豁免、复述性注释反过来提删除）。eventbase-kmp 照抄同一份即可；
 2. 客户端 P0 八条 → 一个分支 + PR（K2/K3 合并改，K1 用 Channel 串行化）；
 3. 客户端 P1 → 一个分支 + PR；服务端 20 条至此**全部关闭**；
 4. ~~服务端 S11/S12~~ 已随本批落地；服务端 P1（S13、S14~S18、S19）留作下一轮；

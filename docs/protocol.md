@@ -1,7 +1,7 @@
 # eventbase 上报协议
 
 > **本文是两端的唯一权威**：服务端实现与本文必须同一个 commit 落地，客户端仓不留副本。
-> 变更须同时在 [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) 开跟进 issue，客户端版本落地前不关。
+> 变更须同时在 [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) 开跟进 issue，客户端版本落地前不关。
 >
 > 版本 **0.1（草案）**——实现尚未开始，字段仍可调整。设计依据见 `telemetry-design.md` §12。
 

@@ -7,7 +7,7 @@
 [![npm](https://img.shields.io/npm/v/@whlong/eventbase)](https://www.npmjs.com/package/@whlong/eventbase)
 [![license](https://img.shields.io/npm/l/@whlong/eventbase)](LICENSE)
 
-eventbase 挂进你已经在跑的 Worker。事件落在**你自己的** D1 里，再通过一个 HTTP 接口读回来——脚本能调，语言模型也能直接调。没有需要注册的托管服务。客户端那一半是 Kotlin Multiplatform 库 [eventbase-kt](https://github.com/HarlonWang/eventbase-kt)。
+eventbase 挂进你已经在跑的 Worker。事件落在**你自己的** D1 里，再通过一个 HTTP 接口读回来——脚本能调，语言模型也能直接调。没有需要注册的托管服务。客户端那一半是 Kotlin Multiplatform 库 [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp)。
 
 ## 为什么
 
@@ -22,7 +22,7 @@ eventbase 挂进你已经在跑的 Worker。事件落在**你自己的** D1 里�
 - **你的 D1，你的数据。** 表结构随包分发，`migrations_dir` 指过去就行。什么都不出你的 Cloudflare 账号，也没有第三方替你保管用户行为。
 - **服务端也能写事件。** `createTracker` 在你的 Worker 里写入，于是客户端观测不到的时刻——配额拦截、成单——落进同一张表，靠 `flow_id` 与客户端事件合流。
 - **一个现成的浏览器看板。** `@whlong/eventbase/dashboard` 把取数面接成一个单文件 HTML 看板：你写筛选、卡片和每张卡的 SQL，ECharts 负责画，不需要构建，见[看板套件](docs/dashboard.md)。
-- **一个替你处理难点的客户端。** [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) 负责离线队列、批量、退避重试与生命周期事件，且**不采集任何设备标识符**。
+- **一个替你处理难点的客户端。** [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) 负责离线队列、批量、退避重试与生命周期事件，且**不采集任何设备标识符**。
 
 ## 快速开始
 
@@ -103,11 +103,11 @@ curl -H "Authorization: Bearer $TOKEN" https://your-worker.example.com/t/q/sql \
   -d '{"sql":"select name, count(*) c from events group by 1 order by c desc"}'
 ```
 
-**6. 接上你的 App。** 把 [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) 指向 `https://your-worker.example.com/t`，入队、批量、重试都归它。
+**6. 接上你的 App。** 把 [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) 指向 `https://your-worker.example.com/t`，入队、批量、重试都归它。
 
 ## 运行要求
 
-Cloudflare Workers，带 D1 binding · `hono` ^4.12.8 · 一个会说[上报协议](docs/protocol.md)的客户端——eventbase-kt，或者你自己发的 HTTP 请求。
+Cloudflare Workers，带 D1 binding · `hono` ^4.12.8 · 一个会说[上报协议](docs/protocol.md)的客户端——eventbase-kmp，或者你自己发的 HTTP 请求。
 
 ## 不包含什么
 

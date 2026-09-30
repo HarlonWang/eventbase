@@ -7,7 +7,7 @@
 [![npm](https://img.shields.io/npm/v/@whlong/eventbase)](https://www.npmjs.com/package/@whlong/eventbase)
 [![license](https://img.shields.io/npm/l/@whlong/eventbase)](LICENSE)
 
-eventbase mounts into a Worker you already run. Events land in **your** D1, and you read them back over an HTTP endpoint that scripts — and language models — can call directly. There is no hosted service to sign up for. The client half is [eventbase-kt](https://github.com/HarlonWang/eventbase-kt), a Kotlin Multiplatform library.
+eventbase mounts into a Worker you already run. Events land in **your** D1, and you read them back over an HTTP endpoint that scripts — and language models — can call directly. There is no hosted service to sign up for. The client half is [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp), a Kotlin Multiplatform library.
 
 ## Why
 
@@ -22,7 +22,7 @@ eventbase mounts into a Worker you already run. Events land in **your** D1, and 
 - **Your D1, your data.** Table definitions ship inside the package; point `migrations_dir` at it and you're done. Nothing leaves your Cloudflare account, and there is no third party to trust with user behaviour.
 - **Server-side events too.** `createTracker` writes from inside your Worker, so the moments a client can't observe — a quota rejection, a completed payment — land in the same table and join up with client events through `flow_id`.
 - **A ready-made browser dashboard.** `@whlong/eventbase/dashboard` turns the query surface into a single-file HTML dashboard: you write the filters, the cards and each card's SQL, ECharts draws them, no build step. See the [dashboard kit](docs/dashboard.md).
-- **A client that handles the hard parts.** [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) gives you an offline queue, batching, backoff and lifecycle events, and it collects no device identifiers at all.
+- **A client that handles the hard parts.** [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) gives you an offline queue, batching, backoff and lifecycle events, and it collects no device identifiers at all.
 
 ## Quick start
 
@@ -103,11 +103,11 @@ curl -H "Authorization: Bearer $TOKEN" https://your-worker.example.com/t/q/sql \
   -d '{"sql":"select name, count(*) c from events group by 1 order by c desc"}'
 ```
 
-**6. Connect your app.** Point [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) at `https://your-worker.example.com/t` and it owns queueing, batching and retries from there.
+**6. Connect your app.** Point [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) at `https://your-worker.example.com/t` and it owns queueing, batching and retries from there.
 
 ## Requirements
 
-Cloudflare Workers with a D1 binding · `hono` ^4.12.8 · a client that speaks the [ingestion protocol](docs/protocol.md) — eventbase-kt, or your own HTTP call.
+Cloudflare Workers with a D1 binding · `hono` ^4.12.8 · a client that speaks the [ingestion protocol](docs/protocol.md) — eventbase-kmp, or your own HTTP call.
 
 ## Not included
 

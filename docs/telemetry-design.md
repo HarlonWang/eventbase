@@ -210,7 +210,7 @@ CREATE TABLE dim_identity_daily (
 
 #### 三个口径不是一回事（2026-08-22 补，读数前必须分清）
 
-`eventbase-kt` 的 `LifecycleTracker` 里 `opened` 标记**进程内一次性、永不复位**，于是：
+`eventbase-kmp` 的 `LifecycleTracker` 里 `opened` 标记**进程内一次性、永不复位**，于是：
 
 | 数什么 | 用什么 | 语义 |
 |---|---|---|
@@ -278,7 +278,7 @@ CREATE TABLE dim_identity_daily (
 ### 12.10 本层待定
 
 1. 事件名白名单开启的时机与维护位置（默认可选，见 5.3）；
-2. `loginbase-kt` 是否依赖埋点 KMP 库——登录漏斗的客户端段由 App 自己上报即可，**倾向不连这条线**；
+2. `loginbase-kmp` 是否依赖埋点 KMP 库——登录漏斗的客户端段由 App 自己上报即可，**倾向不连这条线**；
 3. 保留期与 purge 属 L4（见 13.2），`day` 列与 `daily_rollup` 已为它留好位置。
 
 ## 7. 摄取端滥用面（L4 草案）
@@ -364,8 +364,8 @@ CREATE TABLE dim_identity_daily (
 | 坐标 | 值 | 状态 |
 |---|---|---|
 | GitHub 服务端仓 | `HarlonWang/eventbase` | ✅ 可用 |
-| GitHub 客户端仓 | `HarlonWang/eventbase-kt` | ✅ 可用 |
-| Maven | `wang.harlon:eventbase-kt` | ✅ 自有 namespace |
+| GitHub 客户端仓 | `HarlonWang/eventbase-kmp` | ✅ 可用 |
+| Maven | `wang.harlon:eventbase-kmp` | ✅ 自有 namespace |
 | Kotlin 包 | `wang.harlon.eventbase` | ✅ |
 | **npm** | **`@whlong/eventbase`**（scoped） | 裸名 `eventbase` 被占 |
 
@@ -393,7 +393,7 @@ CREATE TABLE dim_identity_daily (
 - ~~表结构：server / client 事件同表靠 `source` 区分~~ → 12.1
 - ~~摄取端点形态：批量 body、限流维度、单批上限~~ → 12.3
 - ~~loginbase 调本库 writer 的接口形态（决策 4）~~ → 12.7；~~签名细节：writer 必须拿到请求上下文~~ → **已就绪**：`TrackContext` 带 `request`（地理六项由 `geoOf` 自取），`ServerEvent` 带 `flowId` / `installId`，loginbase 侧只需适配 `c.req.raw` 与 `executionCtx.waitUntil`。仍未定的只剩 loginbase 侧 `stats.enabled` 与 `auth_events` 的退役步骤
-- 客户端侧的同构问题：`loginbase-kt` 是否依赖埋点 KMP 库 → 12.8 第 4 条，**倾向不连**
+- 客户端侧的同构问题：`loginbase-kmp` 是否依赖埋点 KMP 库 → 12.8 第 4 条，**倾向不连**
 - ~~session 的定义由谁给~~ → 12.5：客户端算，且必须带后台唤醒标记
 - ~~**`install_id` ↔ `identity_id` 映射**~~ → 12.2 `install_identity` 表；补登不回填。原文：（拆库的先决条件，见 4.3）：靠登录成功事件带 `user_id` 写进埋点库；补登（老用户升级后首次登录前）怎么处理、一机多账号与一账号多机怎么表达
 - ~~**要补发哪些 server 事件**~~ → 12.6 起步四类。原文：（拆库后漏斗闭合的主力，见 4.3 补法 1）：起步清单 `checkout_completed` / `quota_blocked` / 退款 / 绑定；判据是「漏斗末端落在业务库」的都要补

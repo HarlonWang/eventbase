@@ -10,7 +10,7 @@
 |---|---|
 | 业务 Worker 仓（私有） | **首个消费方**：裸 JS Worker，`/t/*` 挂载摄取端；埋点落独立 D1，业务库不动 |
 | [TrendingAI](https://github.com/HarlonWang/TrendingAI) | 客户端消费方，替换 Aptabase；其事件词汇表住私有父仓，本仓不持有 |
-| [eventbase-kt](https://github.com/HarlonWang/eventbase-kt) | **姊妹仓**：KMP 客户端库，独立版本线与 CI；协议以本仓 `docs/protocol.md` 为唯一权威，客户端仓不留副本 |
+| [eventbase-kmp](https://github.com/HarlonWang/eventbase-kmp) | **姊妹仓**：KMP 客户端库，独立版本线与 CI；协议以本仓 `docs/protocol.md` 为唯一权威，客户端仓不留副本 |
 | [loginbase](https://github.com/HarlonWang/loginbase) | 邻居 + 将来的消费方：把本库列为 peerDependency，登录事件写进埋点库，其 `auth_events` 退役 |
 | 私有父仓 | 决策记录的出处，业务读数最终归属地 |
 
@@ -32,6 +32,6 @@
 
 ### 其他
 
-- **协议变更**：实现 + `docs/protocol.md` 必须同一个 commit，同时在 `eventbase-kt` 仓开跟进 issue，客户端版本落地前不关。两仓各自独立版本线，tag 为裸版本号。
+- **协议变更**：实现 + `docs/protocol.md` 必须同一个 commit，同时在 `eventbase-kmp` 仓开跟进 issue，客户端版本落地前不关。两仓各自独立版本线，tag 为裸版本号。
 - **埋点绝不能成为业务的故障源**：服务端写入 `waitUntil` + 吞一切异常；摄取端对拒绝与丢弃恒返回 204，避免客户端把拒收当重试信号；存储故障返回 5xx，由客户端留队列重试。
 - **生产库里有一条冒烟数据**（`channel='smoke'`）：取数与分析时一律排除。

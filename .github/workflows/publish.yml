@@ -45,4 +45,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-  # KMP 客户端在姊妹仓 eventbase-kt，有自己的 tag 与 CI，此处不涉及。
+  # KMP 客户端在姊妹仓 eventbase-kmp，有自己的 tag 与 CI，此处不涉及。

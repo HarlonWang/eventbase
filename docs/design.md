@@ -214,7 +214,7 @@ migrations_dir = "node_modules/@whlong/eventbase/migrations"   # 免复制迁移
 | 角色 | 仓库 | 产物 | 是否部署 |
 |---|---|---|---|
 | **库**（跑在消费方的 Worker 里） | `loginbase` | npm `loginbase` | ❌ |
-| | `loginbase-kt` | Maven `wang.harlon:loginbase-kt` | ❌ |
+| | `loginbase-kmp` | Maven `wang.harlon:loginbase-kmp` | ❌ |
 | | 埋点服务端仓（新） | npm 包 + **协议文档唯一权威** | ❌ |
 | | 埋点 KMP 仓（新） | Maven 客户端库 | ❌ |
 | **看板**（跑在浏览器里） | 埋点服务端仓 `dashboard/` | 随 npm 包分发的 ESM，jsDelivr 直接引用（见 `dashboard.md`） | ❌ |
@@ -230,7 +230,7 @@ npm 侧
          └──────dependency────── 业务 Worker 仓 ──dependency──────┘
 
 Maven 侧
-    埋点-kt ◄──?── loginbase-kt        ← 待议：登录相关的客户端事件由谁上报
+    埋点-kt ◄──?── loginbase-kmp        ← 待议：登录相关的客户端事件由谁上报
        ▲              ▲
        └── TrendingAI ┘
 ```
