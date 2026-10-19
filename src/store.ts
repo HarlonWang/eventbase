@@ -21,6 +21,10 @@ export function dropStatements(
   return [...tally].map(([reason, n]) => insert.bind(day, reason, n));
 }
 
+/**
+ * OR IGNORE 而非 ON CONFLICT 子句：后者要求唯一索引已存在，否则整条 INSERT 报错，
+ * 代码就必须与迁移 0009 同时上线；OR IGNORE 在索引建好前是空操作，允许先发代码再迁移。
+ */
 export function eventStatements(
   db: D1Database,
   events: NormalizedEvent[],
@@ -28,7 +32,7 @@ export function eventStatements(
 ): D1PreparedStatement[] {
   const { batch, geo, receivedAt } = ctx;
   const insert = db.prepare(
-    `INSERT INTO events
+    `INSERT OR IGNORE INTO events
        (received_at, event_at, day, name, source, event_id, install_id, user_id, session_id, flow_id,
         device_id, app_version, platform, channel, sys_locale, country, asn, colo, timezone, city, region,
         is_debug, props)

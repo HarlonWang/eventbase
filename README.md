@@ -18,6 +18,7 @@ eventbase mounts into a Worker you already run. Events land in **your** D1, and 
 ## What you get
 
 - **A query API over your own events.** Five prebuilt metrics (`active`, `new_installs`, `events`, `retention`, `drops`) at `GET /q/m/:metric`, and read-only SQL at `POST /q/sql`, both behind an admin token. The index endpoint describes the whole surface in JSON, so an agent can discover what to ask without reading these docs. No token configured means the read surface never mounts — better a 404 than a door without a lock.
+- **Delivery is at-least-once, storage is exactly-once.** The client persists before sending and only dequeues on `204`, so a suspended or killed process resends the batch. Every event carries a client-generated id and the server deduplicates on it; duplicates are counted in `ingest_drops` rather than stored.
 - **Loss is accountable.** Rejected and dropped batches are counted by day and reason in `ingest_drops`. Together with the client's diagnostic log, that pins a missing event on one of three causes: never tracked, lost in transit, or refused by the server.
 - **Your D1, your data.** Table definitions ship inside the package; point `migrations_dir` at it and you're done. Nothing leaves your Cloudflare account, and there is no third party to trust with user behaviour.
 - **Server-side events too.** `createTracker` writes from inside your Worker, so the moments a client can't observe — a quota rejection, a completed payment — land in the same table and join up with client events through `flow_id`.

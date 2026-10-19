@@ -1,4 +1,6 @@
 import { env } from "cloudflare:workers";
+import dedupeSql from "../migrations/0008_dedupe_events.sql?raw";
+import uniqueSql from "../migrations/0009_event_id_unique.sql?raw";
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashUserId } from "../src/index";
 import { batch, ingest, initDb, post, rows, wipeDb } from "./helpers";
@@ -349,12 +351,58 @@ describe("事件幂等 id", () => {
     expect(row?.event_id.length).toBe(36);
   });
 
-  it("重复 id 当前照收——先观察重复率，不建唯一索引", async () => {
+  it("同一 id 重发只落一行，重复数记进 ingest_drops.duplicate", async () => {
+    const app = ingest();
+    await post(app, batch({ events: [{ name: "app_opened", id: "dup" }, { name: "tab_selected", id: "fresh" }] }));
+    const res = await post(app, batch({ events: [{ name: "app_opened", id: "dup" }, { name: "tab_selected", id: "fresh" }] }));
+
+    expect(res.status).toBe(204);
+    expect(await rows()).toHaveLength(2);
+    const drop = await env.DB.prepare("SELECT n FROM ingest_drops WHERE reason = 'duplicate'").first<{ n: number }>();
+    expect(drop?.n).toBe(2);
+  });
+
+  it("重发批里混有新事件时，新事件照收、只有重复的被吞", async () => {
     const app = ingest();
     await post(app, batch({ events: [{ name: "app_opened", id: "dup" }] }));
-    await post(app, batch({ events: [{ name: "app_opened", id: "dup" }] }));
+    await post(app, batch({ events: [{ name: "app_opened", id: "dup" }, { name: "tab_selected", id: "fresh" }] }));
+
+    expect((await rows()).map((r) => r.event_id)).toEqual(["dup", "fresh"]);
+    const drop = await env.DB.prepare("SELECT n FROM ingest_drops WHERE reason = 'duplicate'").first<{ n: number }>();
+    expect(drop?.n).toBe(1);
+  });
+
+  it("同一请求内重复 id 也只落一行，不让整批失败", async () => {
+    const res = await post(ingest(), batch({ events: [{ name: "app_opened", id: "dup" }, { name: "app_opened", id: "dup" }] }));
+
+    expect(res.status).toBe(204);
+    expect(await rows()).toHaveLength(1);
+  });
+
+  it("不带 id 的事件不受唯一索引约束，多条 NULL 并存", async () => {
+    const app = ingest();
+    await post(app, batch());
+    await post(app, batch());
 
     expect(await rows()).toHaveLength(2);
+    const drop = await env.DB.prepare("SELECT n FROM ingest_drops WHERE reason = 'duplicate'").first<{ n: number }>();
+    expect(drop).toBeNull();
+  });
+
+  it("存量重复由迁移 0008 清掉，只留最早一行", async () => {
+    // 模拟 0009 之前的库：先摘掉唯一索引才能造出重复行，最后按真实顺序重建
+    await env.DB.prepare("DROP INDEX idx_events_event_id").run();
+    const at = Date.now();
+    for (const received of [1, 2, 3]) {
+      await env.DB.prepare(
+        `INSERT INTO events (received_at, event_at, day, name, source, event_id, install_id) VALUES (?, ?, '2026-10-01', 'app_opened', 'client', 'legacy-dup', 'i')`
+      ).bind(received, at).run();
+    }
+    await env.DB.prepare(dedupeSql).run();
+    await env.DB.prepare(uniqueSql).run();
+
+    const kept = await env.DB.prepare("SELECT received_at FROM events WHERE event_id = 'legacy-dup'").all<{ received_at: number }>();
+    expect(kept.results.map((r) => r.received_at)).toEqual([1]);
   });
 });
 

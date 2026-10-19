@@ -159,7 +159,7 @@ CREATE TABLE install_first_seen (
 -- 服务端自己得留一笔，否则「丢了多少」我们也答不上来。按天按原因聚合，不带 install 维度。
 -- 限流丢弃刻意不记：那条路径必须保持零 D1，洪水时每请求写一行等于抵消限流。
 CREATE TABLE ingest_drops (
-  day TEXT NOT NULL, reason TEXT NOT NULL,  -- invalid | expired | future | unknown_event | quota
+  day TEXT NOT NULL, reason TEXT NOT NULL,  -- invalid | expired | future | unknown_event | quota | duplicate
   n INTEGER NOT NULL,
   PRIMARY KEY (day, reason)
 );

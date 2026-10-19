@@ -87,7 +87,10 @@ export function createIngest<TEnv extends object>(config: IngestConfig<TEnv>) {
       ...dropStatements(db, day, drops),
     ].filter((s) => s !== null);
 
-    await db.batch(statements);
+    const results = await db.batch(statements);
+    // 被唯一索引吞掉的重复行 changes 为 0；单独记一笔，重复率从此是看板指标而不是手工 GROUP BY
+    const duplicates = results.slice(0, events.length).filter((r) => r.meta.changes === 0).length;
+    if (duplicates > 0) await db.batch(dropStatements(db, day, new Map([["duplicate", duplicates]])));
     return c.body(null, 204);
   });
 
